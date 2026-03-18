@@ -1,11 +1,10 @@
 """
 Scan commands: scan (run), status, list.
 
-Retry logic for analyse/:
-  - Up to 3 attempts with exponential backoff (2s, 4s, 8s)
-  - On all failures, prints scan ID so user can retry manually
-  - Designed to be transparently replaced by DBOS polling (P2-005)
-    once async analysis lands: analyse/ returns 202 and CLI polls status/
+DBOS async pipeline (P1-007):
+  - analyse/ returns immediately with {"status": "queued", "job_id": "..."}
+  - CLI polls /{scan_id}/status/ until status ∈ {triage, complete, failed}
+  - On failure: prints error_message from status response and exits 1
 """
 import hashlib
 import time
@@ -22,8 +21,12 @@ from sciath_cli.console import console
 
 app = typer.Typer(help="Run and manage vulnerability scans.")
 
-_MAX_ANALYSE_RETRIES = 3
-_ANALYSE_BACKOFF = [2, 4, 8]  # seconds between retries
+# Poll status/ every N seconds; give up after _POLL_MAX attempts (~10 min ceiling)
+_POLL_INTERVAL = 5
+_POLL_MAX = 120
+
+# Terminal statuses — stop polling when reached
+_TERMINAL_STATUSES = {"triage", "complete", "failed", "superseded"}
 
 
 @app.command("run")
@@ -93,35 +96,58 @@ def run_scan(
 
 def _run_analyse_with_retry(api: SciathAPI, scan_id: str, progress, task) -> Optional[dict]:
     """
-    Call analyse/ with exponential backoff retry on server errors.
-    Returns the status dict on success, None on exhausted retries.
+    Dispatch analysis then poll until a terminal status is reached.
+
+    DBOS async contract:
+      1. POST analyse/ → returns immediately with {"status": "queued"}
+      2. Poll GET status/ every _POLL_INTERVAL seconds
+      3. Return status dict when status ∈ _TERMINAL_STATUSES
+      4. Return None on failure (caller exits 1)
     """
-    for attempt, wait in enumerate(_ANALYSE_BACKOFF, start=1):
+    # Step 1: dispatch
+    try:
+        api.trigger_analyse(scan_id)
+    except ServerError as exc:
+        console.print(f"\n[red]✗ Failed to dispatch analysis: {exc}[/red]")
+        console.print(
+            f"  Scan ID: [bold]{scan_id}[/bold]\n"
+            f"  Retry with: [dim]sciath scan reanalyse {scan_id[:8]}[/dim]"
+        )
+        return None
+    except SciathAPIError as exc:
+        console.print(f"\n[red]✗ Analysis failed: {exc}[/red]")
+        console.print(f"  Scan ID: [bold]{scan_id}[/bold]")
+        return None
+
+    # Step 2: poll until terminal
+    progress.update(task, description="  Analysing (polling status)...")
+    for poll_n in range(_POLL_MAX):
+        time.sleep(_POLL_INTERVAL)
         try:
-            api.trigger_analyse(scan_id)
-            return api.get_scan_status(scan_id)
-        except ServerError as exc:
-            if attempt < _MAX_ANALYSE_RETRIES:
-                progress.update(
-                    task,
-                    description=f"  Server error, retrying ({attempt}/{_MAX_ANALYSE_RETRIES - 1})...",
-                )
-                time.sleep(wait)
-            else:
-                console.print(
-                    f"\n[red]✗ Analysis failed after {_MAX_ANALYSE_RETRIES} attempts: {exc}[/red]"
-                )
+            data = api.get_scan_status(scan_id)
+        except SciathAPIError as exc:
+            console.print(f"\n[red]✗ Status poll failed: {exc}[/red]")
+            return None
+
+        status = data.get("status", "")
+        progress.update(task, description=f"  Analysing... [{status}]")
+
+        if status in _TERMINAL_STATUSES:
+            if status == "failed":
+                error = data.get("error_message") or "unknown pipeline error"
+                console.print(f"\n[red]✗ Analysis failed: {error}[/red]")
                 console.print(
                     f"  Scan ID: [bold]{scan_id}[/bold]\n"
                     f"  Retry with: [dim]sciath scan reanalyse {scan_id[:8]}[/dim]"
                 )
                 return None
-        except SciathAPIError as exc:
-            console.print(f"\n[red]✗ Analysis failed: {exc}[/red]")
-            console.print(f"  Scan ID: [bold]{scan_id}[/bold]")
-            return None
+            return data
 
-    return None  # unreachable but satisfies type checker
+    console.print(
+        f"\n[yellow]⚠ Timed out waiting for analysis ({_POLL_MAX * _POLL_INTERVAL}s).[/yellow]\n"
+        f"  The worker may still be running. Check with: [dim]sciath scan status {scan_id[:8]}[/dim]"
+    )
+    return None
 
 
 @app.command()
