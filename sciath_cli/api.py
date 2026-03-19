@@ -208,6 +208,27 @@ class SciathAPI:
         """
         return self._request("GET", f"reports/v1/{report_id}/download/")
 
+    def export_cdx(self, scan_id: str, fmt: str = "vex_cdx", validate: bool = False) -> bytes:
+        """
+        GET /reports/v1/scans/{scan_id}/export/ → raw CycloneDX JSON bytes.
+        Uses a raw httpx request (not _request) to return bytes, not JSON.
+        """
+        response = self._client.request(
+            "GET", f"/api/reports/v1/scans/{scan_id}/export/",
+            params={"format": fmt, "validate": str(validate).lower()},
+        )
+        if response.status_code == 404:
+            raise NotFoundError("Scan not found")
+        if response.status_code == 422:
+            try:
+                detail = response.json().get("detail", response.text)
+            except Exception:
+                detail = response.text
+            raise ValidationError(str(detail))
+        if response.status_code >= 400:
+            raise ServerError(f"Export failed ({response.status_code})", status_code=response.status_code)
+        return response.content
+
     def _download(self, url: str) -> bytes:
         """
         Fetch bytes from a presigned URL (Scaleway S3 or local).

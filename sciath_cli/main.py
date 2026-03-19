@@ -10,7 +10,7 @@ Command structure:
 """
 import typer
 
-from sciath_cli.commands import auth, project, scan, assess, report
+from sciath_cli.commands import auth, project, scan, assess, report, vex
 from sciath_cli import __version__
 
 app = typer.Typer(
@@ -30,6 +30,7 @@ app.add_typer(project.app, name="project")
 app.add_typer(scan.app, name="scan")
 app.add_typer(assess.app, name="assess")
 app.add_typer(report.app, name="report")
+app.add_typer(vex.app, name="vex")
 
 
 @app.callback(invoke_without_command=True)
