@@ -2,13 +2,12 @@
 Integration tests for auth commands via CliRunner + mock HTTP.
 """
 import json
-import pytest
+
 import httpx
-from typer.testing import CliRunner
-
+import pytest
+from sciath_cli.config import SciathConfig, load_config, save_config
 from sciath_cli.main import app
-from sciath_cli.config import SciathConfig, save_config, load_config
-
+from typer.testing import CliRunner
 
 runner = CliRunner()
 

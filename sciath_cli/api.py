@@ -7,12 +7,10 @@ All requests go through _request() which centralises:
   - connection reuse via a persistent httpx.Client
 """
 from typing import Any, Optional
-from uuid import UUID
 
 import httpx
 
 from sciath_cli.config import SciathConfig
-
 
 # ─── Exceptions ───────────────────────────────────────────────────────────────
 

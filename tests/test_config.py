@@ -1,21 +1,15 @@
 """
 Unit tests for config.py: load, save, clear, env var override, @requires_auth.
 """
-import json
-import os
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-import typer
-
 from sciath_cli.config import (
+    DEFAULT_API_URL,
     SciathConfig,
     clear_config,
     load_config,
     requires_auth,
     save_config,
-    DEFAULT_API_URL,
 )
 
 

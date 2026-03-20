@@ -29,7 +29,7 @@ def vex(
     Faster than 'sciath report' — returns JSON immediately without going through
     the GENERATING→READY lifecycle. Use for CI pipelines.
     """
-    from sciath_cli.api import SciathAPI, SciathAPIError, NotFoundError, ValidationError
+    from sciath_cli.api import NotFoundError, SciathAPI, SciathAPIError, ValidationError
 
     if fmt not in _VALID_FORMATS:
         console.print(f"[red]✗ Unknown format '{fmt}'. Choose: {', '.join(sorted(_VALID_FORMATS))}[/red]")

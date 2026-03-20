@@ -7,12 +7,12 @@ Login uses the device code flow already built in api/routers/auth.py:
 """
 import time
 
-import typer
 import httpx
+import typer
 from rich.live import Live
 from rich.spinner import Spinner
 
-from sciath_cli.config import load_config, save_config, clear_config, SciathConfig
+from sciath_cli.config import clear_config, load_config, save_config
 from sciath_cli.console import console
 
 app = typer.Typer(help="Authentication commands.")
@@ -85,7 +85,7 @@ def login(
     save_config(config)
 
     console.print(f"[green]✓[/green] Authenticated as [bold]{result['user_email']}[/bold] ({result['customer_name']})")
-    console.print(f"[green]✓[/green] Credentials saved to ~/.sciath/config.json")
+    console.print("[green]✓[/green] Credentials saved to ~/.sciath/config.json")
 
 
 @app.command()

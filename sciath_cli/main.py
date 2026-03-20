@@ -10,8 +10,8 @@ Command structure:
 """
 import typer
 
-from sciath_cli.commands import auth, project, scan, assess, report, vex
 from sciath_cli import __version__
+from sciath_cli.commands import assess, auth, project, report, scan, vex
 
 app = typer.Typer(
     name="sciath",

@@ -2,13 +2,11 @@
 Integration tests for scan commands via CliRunner + mock API.
 """
 import json
+
 import pytest
-import httpx
-from typer.testing import CliRunner
-
-from sciath_cli.main import app
 from sciath_cli.config import SciathConfig, save_config
-
+from sciath_cli.main import app
+from typer.testing import CliRunner
 
 runner = CliRunner()
 

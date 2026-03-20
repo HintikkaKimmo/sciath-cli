@@ -6,7 +6,7 @@ from typing import Optional
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from sciath_cli.api import SciathAPI, SciathAPIError, NotFoundError, ServerError
+from sciath_cli.api import NotFoundError, SciathAPI, SciathAPIError
 from sciath_cli.config import requires_auth
 from sciath_cli.console import console
 

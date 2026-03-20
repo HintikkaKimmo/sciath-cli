@@ -3,16 +3,15 @@ Unit tests for SciathAPI._request() error handling.
 
 Uses httpx.MockTransport to simulate backend responses without a real server.
 """
-import pytest
 import httpx
-
+import pytest
 from sciath_cli.api import (
-    SciathAPI,
     AuthError,
-    ScopeError,
     NotFoundError,
-    ValidationError,
+    SciathAPI,
+    ScopeError,
     ServerError,
+    ValidationError,
 )
 from sciath_cli.config import SciathConfig
 
