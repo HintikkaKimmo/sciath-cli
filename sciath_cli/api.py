@@ -213,7 +213,7 @@ class SciathAPI:
         """
         response = self._client.request(
             "GET", f"/api/reports/v1/scans/{scan_id}/export/",
-            params={"format": fmt, "validate": str(validate).lower()},
+            params={"format": fmt, "check_schema": str(validate).lower()},
         )
         if response.status_code == 404:
             raise NotFoundError("Scan not found")
