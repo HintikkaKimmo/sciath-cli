@@ -33,6 +33,15 @@ app.add_typer(report.app, name="report")
 app.add_typer(vex.app, name="vex")
 
 
+@app.command("mcp")
+def mcp_server():
+    """Start MCP server for editor integration (Claude Code, Cursor, etc.)."""
+    import asyncio
+
+    from sciath_cli.mcp_server import run_server
+    asyncio.run(run_server())
+
+
 @app.callback(invoke_without_command=True)
 def version_flag(
     version: bool = typer.Option(False, "--version", "-V", help="Show version and exit", is_eager=True),

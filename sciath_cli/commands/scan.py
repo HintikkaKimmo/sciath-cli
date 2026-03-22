@@ -45,6 +45,7 @@ def run_scan(
     explain: bool = typer.Option(False, "--explain", "-e", help="Show filter reasoning per CVE"),
     severity_threshold: str = typer.Option("", "--severity-threshold", help="Exit 1 if findings >= threshold (critical/high/medium/low)"),
     fail_on_kev: bool = typer.Option(False, "--fail-on-kev", help="Exit 1 if any CISA KEV finding is open"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Skip local cache, force fresh upload"),
     config=None,
 ):
     """Run a vulnerability scan on a firmware SBOM."""
@@ -81,6 +82,13 @@ def run_scan(
     kconfig_raw = kconfig.read_text(errors="replace") if kconfig else ""
     dtb_raw = dtb.read_text(errors="replace") if dtb else ""
 
+    # Check local cache for matching inputs
+    from sciath_cli import cache as _cache
+
+    cached_scan_id = None
+    if not no_cache:
+        cached_scan_id = _cache.get_cached_scan(proj_id, sbom_raw, kconfig_raw, dtb_raw)
+
     # Idempotency key: hash of project + version + sbom content
     idem_key = hashlib.sha256(f"{proj_id}:{version}:{sbom_raw[:500]}".encode()).hexdigest()[:32]
 
@@ -95,6 +103,26 @@ def run_scan(
         task = progress.add_task("  Uploading artifacts...", total=None)
 
         with SciathAPI(config) as api:
+            # Use cached scan if available
+            if cached_scan_id:
+                try:
+                    result = api.get_scan_status(cached_scan_id)
+                    if result.get("status") in _TERMINAL_STATUSES:
+                        progress.update(task, description="  Using cached result...")
+                        # Fetch assessments if needed
+                        assessments = None
+                        if explain or output_format == "json" or severity_threshold or fail_on_kev:
+                            try:
+                                resp = api.list_assessments(scan_id=cached_scan_id, limit=500)
+                                assessments = resp.get("items", [])
+                            except SciathAPIError:
+                                pass
+                        console.print("  [dim]Cache hit — using previous scan result[/dim]")
+                        formatter.render_scan(result, assessments=assessments)
+                        raise typer.Exit(formatter.exit_code)
+                except SciathAPIError:
+                    pass  # Cache miss — scan may have been deleted, proceed with upload
+
             try:
                 scan = api.create_scan(
                     project_id=proj_id,
@@ -125,6 +153,9 @@ def run_scan(
 
     if result is None:
         raise typer.Exit(1)
+
+    # Save to local cache for future runs with same inputs
+    _cache.save_cache(proj_id, sbom_raw, kconfig_raw, dtb_raw, str(result.get("id", "")))
 
     formatter.render_scan(result, assessments=assessments)
     raise typer.Exit(formatter.exit_code)
