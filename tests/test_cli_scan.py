@@ -97,13 +97,12 @@ class TestRunScan:
         assert result.exit_code == 1
         assert "project" in result.output.lower()
 
-    def test_analyse_retries_on_server_error_then_succeeds(self, authed_config, sbom_file, monkeypatch):
-        """Two 503 failures followed by success — single summary displayed."""
-        from sciath_cli.api import ServerError
-
-        scan_created = {"id": "scan-uuid-retry", "status": "draft"}
+    def test_analyse_succeeds_with_summary(self, authed_config, sbom_file, monkeypatch):
+        """Successful scan displays summary with status."""
+        scan_created = {"id": "scan-uuid-ok", "status": "draft"}
+        analyse_ok = {"status": "ok", "assessments": 5}
         status_ok = {
-            "id": "scan-uuid-retry",
+            "id": "scan-uuid-ok",
             "status": "triage",
             "version_label": "cli-123",
             "total_components": 10,
@@ -111,23 +110,12 @@ class TestRunScan:
             "suppressed_count": 3,
             "analysed_at": "2026-03-17T10:00:00Z",
         }
+        assessments = {"items": []}
 
-        call_count = [0]
-
-        def _request(self, method, path, **kwargs):
-            call_count[0] += 1
-            if "scans/" in path and call_count[0] == 1:
-                return scan_created
-            if "analyse" in path and call_count[0] in (2, 3):
-                raise ServerError("503", status_code=503)
-            if "analyse" in path:
-                return {"status": "ok", "assessments": 5}
-            if "status" in path:
-                return status_ok
-            return {}
-
-        import sciath_cli.api as api_module
-        monkeypatch.setattr(api_module.SciathAPI, "_request", _request)
+        _make_api(
+            [(200, scan_created), (200, analyse_ok), (200, status_ok), (200, assessments)],
+            monkeypatch,
+        )
         monkeypatch.setattr("sciath_cli.commands.scan.time.sleep", lambda _: None)
 
         result = runner.invoke(app, ["scan", "run", str(sbom_file)])

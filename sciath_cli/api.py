@@ -144,21 +144,26 @@ class SciathAPI:
         sbom_raw: str,
         sbom_format: str,
         kconfig_raw: str = "",
+        dtb_raw: str = "",
         idempotency_key: Optional[str] = None,
     ) -> dict:
         headers = {}
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
 
+        payload: dict = {
+            "project_id": project_id,
+            "version_label": version_label,
+            "sbom_raw": sbom_raw,
+            "sbom_format": sbom_format,
+            "kconfig_raw": kconfig_raw,
+        }
+        if dtb_raw:
+            payload["dtb_raw"] = dtb_raw
+
         return self._request(
             "POST", "core/v1/scans/",
-            json={
-                "project_id": project_id,
-                "version_label": version_label,
-                "sbom_raw": sbom_raw,
-                "sbom_format": sbom_format,
-                "kconfig_raw": kconfig_raw,
-            },
+            json=payload,
             headers=headers,
         )
 

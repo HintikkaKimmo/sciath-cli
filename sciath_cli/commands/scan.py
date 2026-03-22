@@ -1,10 +1,13 @@
 """
 Scan commands: scan (run), status, list.
 
-DBOS async pipeline (P1-007):
+DBOS async pipeline:
   - analyse/ returns immediately with {"status": "queued", "job_id": "..."}
   - CLI polls /{scan_id}/status/ until status ∈ {triage, complete, failed}
   - On failure: prints error_message from status response and exits 1
+
+Output flow:
+  scan result → OutputFormatter (format, explain, exit code threshold)
 """
 import hashlib
 import time
@@ -18,6 +21,7 @@ from rich.table import Table
 from sciath_cli.api import SciathAPI, SciathAPIError, ServerError
 from sciath_cli.config import requires_auth
 from sciath_cli.console import console
+from sciath_cli.output import OutputFormatter
 
 app = typer.Typer(help="Run and manage vulnerability scans.")
 
@@ -32,17 +36,34 @@ _TERMINAL_STATUSES = {"triage", "complete", "failed", "superseded"}
 @app.command("run")
 @requires_auth
 def run_scan(
-    sbom: Path = typer.Argument(..., help="Path to SBOM file (CycloneDX JSON/XML, SPDX JSON, Yocto manifest)"),
+    sbom: Optional[Path] = typer.Argument(None, help="Path to SBOM file (auto-detected if omitted)"),
     kconfig: Optional[Path] = typer.Option(None, "--kconfig", "-k", help="Kernel .config file"),
+    dtb: Optional[Path] = typer.Option(None, "--dtb", "-d", help="Device Tree Blob file (.dts/.dtb)"),
     version: Optional[str] = typer.Option(None, "--version", "-v", help="Version label (default: timestamp)"),
     project_id: Optional[str] = typer.Option(None, "--project", "-p", help="Project ID (overrides active project)"),
-    output_json: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, quiet"),
+    explain: bool = typer.Option(False, "--explain", "-e", help="Show filter reasoning per CVE"),
+    severity_threshold: str = typer.Option("", "--severity-threshold", help="Exit 1 if findings >= threshold (critical/high/medium/low)"),
+    fail_on_kev: bool = typer.Option(False, "--fail-on-kev", help="Exit 1 if any CISA KEV finding is open"),
     config=None,
 ):
     """Run a vulnerability scan on a firmware SBOM."""
-    if not sbom.exists():
+    # Auto-detect SBOM if not provided
+    if sbom is None:
+        sbom = _auto_detect_sbom()
+        if sbom is None:
+            raise typer.Exit(1)
+    elif not sbom.exists():
         console.print(f"[red]✗ SBOM file not found: {sbom}[/red]")
         raise typer.Exit(1)
+
+    # Auto-detect kconfig if not provided
+    if kconfig is None:
+        kconfig = _auto_detect_file([".config", "build/.config"])
+
+    # Auto-detect DTB if not provided
+    if dtb is None:
+        dtb = _auto_detect_file_glob(["*.dts", "*.dtb"])
 
     proj_id = project_id or config.active_project_id
     if not proj_id:
@@ -58,9 +79,17 @@ def run_scan(
     sbom_raw = sbom.read_text(errors="replace")
     sbom_format = _detect_format(sbom, sbom_raw)
     kconfig_raw = kconfig.read_text(errors="replace") if kconfig else ""
+    dtb_raw = dtb.read_text(errors="replace") if dtb else ""
 
     # Idempotency key: hash of project + version + sbom content
     idem_key = hashlib.sha256(f"{proj_id}:{version}:{sbom_raw[:500]}".encode()).hexdigest()[:32]
+
+    formatter = OutputFormatter(
+        format=output_format,
+        explain=explain,
+        severity_threshold=severity_threshold,
+        fail_on_kev=fail_on_kev,
+    )
 
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console) as progress:
         task = progress.add_task("  Uploading artifacts...", total=None)
@@ -73,6 +102,7 @@ def run_scan(
                     sbom_raw=sbom_raw,
                     sbom_format=sbom_format,
                     kconfig_raw=kconfig_raw,
+                    dtb_raw=dtb_raw,
                     idempotency_key=idem_key,
                 )
             except SciathAPIError as exc:
@@ -84,14 +114,20 @@ def run_scan(
 
             result = _run_analyse_with_retry(api, scan_id, progress, task)
 
+            # Fetch assessments for explain/json/exit-code features
+            assessments = None
+            if result and (explain or output_format == "json" or severity_threshold or fail_on_kev):
+                try:
+                    resp = api.list_assessments(scan_id=scan_id, limit=500)
+                    assessments = resp.get("items", [])
+                except SciathAPIError:
+                    pass  # Non-fatal — render without assessments
+
     if result is None:
         raise typer.Exit(1)
 
-    if output_json:
-        import json
-        console.print_json(json.dumps(result))
-    else:
-        _display_scan_summary(result)
+    formatter.render_scan(result, assessments=assessments)
+    raise typer.Exit(formatter.exit_code)
 
 
 def _run_analyse_with_retry(api: SciathAPI, scan_id: str, progress, task) -> Optional[dict]:
@@ -154,10 +190,12 @@ def _run_analyse_with_retry(api: SciathAPI, scan_id: str, progress, task) -> Opt
 @requires_auth
 def reanalyse(
     scan_id: str = typer.Argument(..., help="Scan ID or prefix"),
-    output_json: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, quiet"),
     config=None,
 ):
     """Re-run analysis on an existing scan (e.g. after a previous failure)."""
+    formatter = OutputFormatter(format=output_format)
+
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console) as progress:
         task = progress.add_task("  Running analysis...", total=None)
         with SciathAPI(config) as api:
@@ -166,11 +204,8 @@ def reanalyse(
     if result is None:
         raise typer.Exit(1)
 
-    if output_json:
-        import json
-        console.print_json(json.dumps(result))
-    else:
-        _display_scan_summary(result)
+    formatter.render_scan(result)
+    raise typer.Exit(formatter.exit_code)
 
 
 @app.command()
@@ -230,6 +265,74 @@ def list_scans(
         )
 
     console.print(table)
+
+
+# ── Auto-detection ──────────────────────────────────────────────────────────
+
+_SBOM_CANDIDATES = [
+    "sbom.json", "bom.json", "sbom.xml", "bom.xml",
+    "sbom.cdx.json", "sbom.spdx.json",
+]
+
+_SBOM_GLOBS = [
+    "build/tmp/deploy/*/sbom-*.json",
+]
+
+
+def _auto_detect_sbom() -> Optional[Path]:
+    """Auto-discover SBOM file in the current directory."""
+    from pathlib import Path as P
+    cwd = P.cwd()
+
+    # Check named candidates
+    for name in _SBOM_CANDIDATES:
+        candidate = cwd / name
+        if candidate.exists():
+            console.print(f"  [dim]Auto-detected SBOM: {candidate.name}[/dim]")
+            return candidate
+
+    # Check glob patterns
+    import glob
+    for pattern in _SBOM_GLOBS:
+        matches = sorted(glob.glob(str(cwd / pattern)))
+        if matches:
+            found = P(matches[0])
+            console.print(f"  [dim]Auto-detected SBOM: {found.relative_to(cwd)}[/dim]")
+            if len(matches) > 1:
+                console.print(f"  [yellow]⚠ Found {len(matches)} SBOMs — using first. Specify path to override.[/yellow]")
+            return found
+
+    console.print("[red]✗ No SBOM file found.[/red] Checked:")
+    for name in _SBOM_CANDIDATES:
+        console.print(f"  [dim]{name}[/dim]")
+    for pattern in _SBOM_GLOBS:
+        console.print(f"  [dim]{pattern}[/dim]")
+    console.print("\nSpecify the SBOM path: [bold]sciath scan run <path>[/bold]")
+    return None
+
+
+def _auto_detect_file(candidates: list[str]) -> Optional[Path]:
+    """Check a list of relative paths, return first that exists."""
+    from pathlib import Path as P
+    for name in candidates:
+        candidate = P.cwd() / name
+        if candidate.exists():
+            console.print(f"  [dim]Auto-detected: {name}[/dim]")
+            return candidate
+    return None
+
+
+def _auto_detect_file_glob(patterns: list[str]) -> Optional[Path]:
+    """Check glob patterns in cwd, return first match."""
+    import glob
+    from pathlib import Path as P
+    for pattern in patterns:
+        matches = sorted(glob.glob(str(P.cwd() / pattern)))
+        if matches:
+            found = P(matches[0])
+            console.print(f"  [dim]Auto-detected: {found.name}[/dim]")
+            return found
+    return None
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
