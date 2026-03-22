@@ -46,7 +46,7 @@ def get_cached_scan(project_id: str, sbom_raw: str, kconfig_raw: str = "", dtb_r
 
 
 def save_cache(project_id: str, sbom_raw: str, kconfig_raw: str, dtb_raw: str, scan_id: str) -> None:
-    """Save a scan result to the local cache."""
+    """Save a scan result to the local cache. Also cleans up expired entries."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     key = _cache_key(project_id, sbom_raw, kconfig_raw, dtb_raw)
     cache_file = CACHE_DIR / f"{key}.json"
@@ -57,3 +57,37 @@ def save_cache(project_id: str, sbom_raw: str, kconfig_raw: str, dtb_raw: str, s
         "timestamp": time.time(),
     }
     cache_file.write_text(json.dumps(data))
+
+    # Opportunistic cleanup of expired cache entries
+    _cleanup_expired()
+
+
+def _cleanup_expired() -> int:
+    """Remove expired cache files. Returns count of files removed."""
+    if not CACHE_DIR.exists():
+        return 0
+
+    now = time.time()
+    removed = 0
+    for f in CACHE_DIR.glob("*.json"):
+        try:
+            data = json.loads(f.read_text())
+            if now - data.get("timestamp", 0) > DEFAULT_TTL:
+                f.unlink(missing_ok=True)
+                removed += 1
+        except (json.JSONDecodeError, OSError):
+            f.unlink(missing_ok=True)
+            removed += 1
+    return removed
+
+
+def clear_all() -> int:
+    """Remove all cache files. Returns count of files removed."""
+    if not CACHE_DIR.exists():
+        return 0
+
+    removed = 0
+    for f in CACHE_DIR.glob("*.json"):
+        f.unlink(missing_ok=True)
+        removed += 1
+    return removed

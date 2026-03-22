@@ -33,6 +33,21 @@ app.add_typer(report.app, name="report")
 app.add_typer(vex.app, name="vex")
 
 
+cache_app = typer.Typer(help="Manage the local scan cache.")
+
+
+@cache_app.command("clear")
+def cache_clear():
+    """Remove all cached scan results."""
+    from sciath_cli.cache import clear_all
+    from sciath_cli.console import console
+    count = clear_all()
+    console.print(f"[green]Cleared {count} cached scan result(s).[/green]")
+
+
+app.add_typer(cache_app, name="cache")
+
+
 @app.command("mcp")
 def mcp_server():
     """Start MCP server for editor integration (Claude Code, Cursor, etc.)."""

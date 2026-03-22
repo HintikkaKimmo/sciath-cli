@@ -134,7 +134,7 @@ async def _tool_scan_sbom(args: dict):
     from sciath_cli.commands.scan import _detect_format
     sbom_format = _detect_format(sbom_path, sbom_raw)
 
-    idem_key = hashlib.sha256(f"{project_id}:{version}:{sbom_raw[:500]}".encode()).hexdigest()[:32]
+    idem_key = hashlib.sha256(f"{project_id}:{version}:{sbom_raw}".encode()).hexdigest()[:32]
 
     api = _get_api()
     try:

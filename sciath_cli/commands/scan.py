@@ -90,7 +90,7 @@ def run_scan(
         cached_scan_id = _cache.get_cached_scan(proj_id, sbom_raw, kconfig_raw, dtb_raw)
 
     # Idempotency key: hash of project + version + sbom content
-    idem_key = hashlib.sha256(f"{proj_id}:{version}:{sbom_raw[:500]}".encode()).hexdigest()[:32]
+    idem_key = hashlib.sha256(f"{proj_id}:{version}:{sbom_raw}".encode()).hexdigest()[:32]
 
     formatter = OutputFormatter(
         format=output_format,

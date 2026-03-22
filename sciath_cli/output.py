@@ -29,7 +29,7 @@ class OutputFormatter:
     Usage:
         fmt = OutputFormatter(format="table", explain=True, severity_threshold="critical")
         fmt.render_scan(result, assessments=assessments)
-        sys.exit(fmt.exit_code)
+        raise typer.Exit(fmt.exit_code)
     """
 
     format: str = "table"  # table, json, quiet
