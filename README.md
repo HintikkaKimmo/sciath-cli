@@ -4,6 +4,8 @@
 [![Python](https://img.shields.io/pypi/pyversions/sciath-cli)](https://pypi.org/project/sciath-cli/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+[![Upload Python Package](https://github.com/HintikkaKimmo/sciath-cli/actions/workflows/python-publish.yml/badge.svg?branch=master)](https://github.com/HintikkaKimmo/sciath-cli/actions/workflows/python-publish.yml)
+
 Command-line interface for [Sciath](https://sciath.io) — CRA compliance
 automation for embedded Linux.
 
