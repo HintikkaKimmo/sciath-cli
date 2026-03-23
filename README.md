@@ -2,9 +2,12 @@
 
 [![PyPI](https://img.shields.io/pypi/v/sciath-cli)](https://pypi.org/project/sciath-cli/)
 [![Python](https://img.shields.io/pypi/pyversions/sciath-cli)](https://pypi.org/project/sciath-cli/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Command-line interface for [Sciath](https://sciath.io) — CRA compliance
 automation for embedded Linux.
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Install
 
@@ -15,7 +18,7 @@ pip install sciath-cli
 For development (from this repo):
 
 ```bash
-pip install -e sciath-cli/
+pip install -e ".[dev]"
 ```
 
 ---
