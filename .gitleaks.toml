@@ -1,0 +1,19 @@
+# Gitleaks configuration for sciath-cli
+# https://github.com/gitleaks/gitleaks
+
+title = "sciath-cli gitleaks config"
+
+[extend]
+# Use the default gitleaks ruleset as the base
+useDefault = true
+
+[allowlist]
+description = "Global allowlist"
+
+paths = [
+    '''\.venv/''',
+    '''venv/''',
+    '''\.pytest_cache/''',
+    '''__pycache__/''',
+    '''uv\.lock''',
+]

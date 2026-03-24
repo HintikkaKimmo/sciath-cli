@@ -42,6 +42,7 @@ sciath = "sciath_cli.main:main"
 dev = [
     "pytest>=8.0.0",
     "pytest-httpx>=0.30.0",
+    "pip-audit>=2.7.0",
 ]
 dist = [
     "pyinstaller>=6.0.0",
