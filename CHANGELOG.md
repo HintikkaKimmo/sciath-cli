@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Network & proxy configuration guide in README (proxy, TLS inspection, firewall allowlist)
+
 - `sciath login` — device-flow OAuth authentication (Google, GitHub, GitLab)
 - `sciath scan upload` — upload SBOM (CycloneDX, SPDX, Yocto manifest) with optional Kconfig and DTB
 - `sciath scan status` — poll scan analysis progress with live progress bar

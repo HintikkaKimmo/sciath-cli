@@ -256,6 +256,60 @@ Credentials stored at `~/.sciath/config.json` (mode 0600).
 
 ---
 
+## Network & Proxy Configuration
+
+The CLI needs outbound HTTPS access to the Sciath API. If your
+environment uses a corporate proxy or firewall allowlisting, see below.
+
+### Firewall allowlist
+
+Allow outbound HTTPS (port 443) to:
+
+| Domain | Purpose |
+|--------|---------|
+| `api.sciath.io` | API requests |
+| `sciath.io` | Device-code login flow |
+
+> **Note:** Sciath is hosted behind a load balancer without static IPs.
+> Use domain-based (FQDN) rules, not IP-based rules.
+
+### HTTP/HTTPS proxy
+
+The CLI uses [httpx](https://www.python-httpx.org/) which respects
+standard proxy environment variables:
+
+```bash
+export HTTPS_PROXY=http://proxy.corp.example:8080
+
+# With authentication
+export HTTPS_PROXY=http://user:password@proxy.corp.example:8080
+```
+
+### Custom TLS certificates
+
+If your proxy performs TLS inspection (MITM), you need to trust its
+CA certificate:
+
+```bash
+export SSL_CERT_FILE=/path/to/corporate-ca-bundle.crt
+```
+
+`REQUESTS_CA_BUNDLE` and `CURL_CA_BUNDLE` are also supported.
+
+### Private / on-prem API endpoint
+
+If you run a self-hosted Sciath instance, point the CLI at it:
+
+```bash
+# Persistent (saved to ~/.sciath/config.json)
+sciath config set api_url https://sciath.internal.example.com
+
+# Or per-session via environment variable
+export SCIATH_API_URL=https://sciath.internal.example.com
+```
+
+---
+
 ## Sample SBOM
 
 Save as `sbom.json` and run `sciath scan`:
