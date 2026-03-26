@@ -21,6 +21,19 @@ from rich.table import Table
 from sciath_cli.console import console
 
 
+def _quality_grade(score: float) -> str:
+    """Convert a 0.0-1.0 quality score to a letter grade."""
+    if score >= 0.9:
+        return "A"
+    if score >= 0.8:
+        return "B"
+    if score >= 0.7:
+        return "C"
+    if score >= 0.6:
+        return "D"
+    return "F"
+
+
 @dataclass
 class OutputFormatter:
     """
@@ -82,7 +95,7 @@ class OutputFormatter:
         """Rich table output for TTY."""
         total = data.get("total_vulnerabilities", 0)
         suppressed = data.get("suppressed_count", 0)
-        remaining = total - suppressed
+        remaining = data.get("remaining_count", total - suppressed)
         pct = round(suppressed / total * 100) if total > 0 else 0
 
         table = Table(title="SCAN SUMMARY", box=None, show_header=False, padding=(0, 2))
@@ -96,6 +109,11 @@ class OutputFormatter:
         table.add_row("Status:", data.get("status", "").upper())
         table.add_row("Version:", data.get("version_label", ""))
         table.add_row("Scan ID:", str(data.get("id", ""))[:8])
+
+        quality = data.get("sbom_quality_score")
+        if quality is not None:
+            grade = _quality_grade(quality)
+            table.add_row("SBOM Quality:", f"{quality:.0%} ({grade})")
 
         console.print()
         console.print(table)
@@ -121,6 +139,7 @@ class OutputFormatter:
         table = Table(title="FILTER REASONING", box=None, show_header=True, padding=(0, 1))
         table.add_column("CVE", style="bold")
         table.add_column("Layer", style="dim")
+        table.add_column("Layers Applied", style="dim")
         table.add_column("Status")
         table.add_column("Reason")
 
@@ -128,9 +147,11 @@ class OutputFormatter:
             vuln = a.get("vulnerability", {})
             status = a.get("status", "")
             color = "green" if status == "not_affected" else "red" if status == "affected" else "yellow"
+            layers = ", ".join(a.get("applied_filter_layers", [])) or a.get("filter_layer", "")
             table.add_row(
                 vuln.get("vuln_id", ""),
                 a.get("filter_layer", ""),
+                layers,
                 f"[{color}]{status}[/{color}]",
                 (a.get("justification_text") or a.get("justification_category") or "—")[:80],
             )
@@ -141,9 +162,9 @@ class OutputFormatter:
         """Composable JSON output with summary and optional reasoning."""
         total = data.get("total_vulnerabilities", 0)
         suppressed = data.get("suppressed_count", 0)
-        remaining = total - suppressed
+        remaining = data.get("remaining_count", total - suppressed)
 
-        output = {
+        output: dict = {
             "summary": (
                 f"{remaining} open CVEs out of {total} total. "
                 f"{suppressed} suppressed ({round(suppressed / total * 100) if total else 0}%). "
@@ -159,17 +180,26 @@ class OutputFormatter:
             "analysed_at": data.get("analysed_at", ""),
         }
 
+        quality = data.get("sbom_quality_score")
+        if quality is not None:
+            output["sbom_quality_score"] = quality
+
         if assessments:
             output["assessments"] = [
                 {
                     "cve_id": a.get("vulnerability", {}).get("vuln_id", ""),
                     "cvss": a.get("vulnerability", {}).get("cvss_score"),
+                    "epss_score": a.get("vulnerability", {}).get("epss_score"),
                     "is_kev": a.get("vulnerability", {}).get("is_kev", False),
+                    "matched_sources": a.get("vulnerability", {}).get("matched_sources", []),
+                    "confidence_tier": a.get("vulnerability", {}).get("confidence_tier", ""),
                     "component": a.get("vulnerability", {}).get("component", {}).get("name", ""),
                     "status": a.get("status", ""),
                     "filter_layer": a.get("filter_layer", ""),
+                    "applied_filter_layers": a.get("applied_filter_layers", []),
                     "justification": a.get("justification_text", ""),
                     "confidence": a.get("confidence", ""),
+                    "contextual_cvss": a.get("contextual_cvss"),
                 }
                 for a in assessments
             ]

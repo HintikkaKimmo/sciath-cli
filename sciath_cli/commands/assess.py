@@ -18,6 +18,7 @@ app = typer.Typer(help="Review vulnerability assessments.")
 def list_assessments(
     scan_id: Optional[str] = typer.Argument(None, help="Scan ID or prefix to filter by"),
     pending_only: bool = typer.Option(True, "--pending/--all", help="Show only assessments needing review"),
+    filter_layer: Optional[str] = typer.Option(None, "--filter-layer", help="Filter by layer (kconfig/dtb/busybox/packageconfig/patch/custom/build_time/deployment)"),
     config=None,
 ):
     """List vulnerability assessments for a scan."""
@@ -26,6 +27,7 @@ def list_assessments(
             result = api.list_assessments(
                 scan_id=scan_id,
                 status="auto_pending" if pending_only else None,
+                filter_layer=filter_layer,
             )
         except SciathAPIError as exc:
             console.print(f"[red]✗ {exc}[/red]")
@@ -38,18 +40,27 @@ def list_assessments(
 
     table = Table(show_header=True, header_style="bold")
     table.add_column("CVE ID")
+    table.add_column("CVSS", justify="right")
     table.add_column("Status")
     table.add_column("Filter Layer")
     table.add_column("Confidence")
+    table.add_column("EPSS", justify="right")
+    table.add_column("Sources")
     table.add_column("ID", style="dim")
 
     for a in items:
         vuln = a.get("vulnerability") or {}
+        cvss = vuln.get("cvss_score")
+        epss = vuln.get("epss_score")
+        tier = vuln.get("confidence_tier", "")
         table.add_row(
             vuln.get("vuln_id", a.get("vuln_id", "")),
+            f"{cvss:.1f}" if cvss is not None else "",
             a.get("status", ""),
             a.get("filter_layer", ""),
             str(a.get("confidence", "")),
+            f"{epss:.0%}" if epss is not None else "",
+            tier,
             a["id"][:8],
         )
 

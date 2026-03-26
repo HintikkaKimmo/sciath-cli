@@ -145,6 +145,10 @@ class SciathAPI:
         sbom_format: str,
         kconfig_raw: str = "",
         dtb_raw: str = "",
+        custom_filter_raw: str = "",
+        yocto_machine: str = "",
+        yocto_distro: str = "",
+        kernel_version: str = "",
         idempotency_key: Optional[str] = None,
     ) -> dict:
         headers = {}
@@ -160,6 +164,14 @@ class SciathAPI:
         }
         if dtb_raw:
             payload["dtb_raw"] = dtb_raw
+        if custom_filter_raw:
+            payload["custom_filter_raw"] = custom_filter_raw
+        if yocto_machine:
+            payload["yocto_machine"] = yocto_machine
+        if yocto_distro:
+            payload["yocto_distro"] = yocto_distro
+        if kernel_version:
+            payload["kernel_version"] = kernel_version
 
         return self._request(
             "POST", "core/v1/scans/",
@@ -179,6 +191,7 @@ class SciathAPI:
         self,
         scan_id: Optional[str] = None,
         status: Optional[str] = None,
+        filter_layer: Optional[str] = None,
         limit: int = 50,
     ) -> dict:
         params: dict = {"limit": limit}
@@ -186,6 +199,8 @@ class SciathAPI:
             params["scan_id"] = scan_id
         if status:
             params["status"] = status
+        if filter_layer:
+            params["filter_layer"] = filter_layer
         return self._request("GET", "assessments/v1/assessments/", params=params)
 
     def update_assessment(self, assessment_id: str, payload: dict) -> dict:

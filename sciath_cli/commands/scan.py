@@ -39,6 +39,10 @@ def run_scan(
     sbom: Optional[Path] = typer.Argument(None, help="Path to SBOM file (auto-detected if omitted)"),
     kconfig: Optional[Path] = typer.Option(None, "--kconfig", "-k", help="Kernel .config file"),
     dtb: Optional[Path] = typer.Option(None, "--dtb", "-d", help="Device Tree Blob file (.dts/.dtb)"),
+    custom_filter: Optional[Path] = typer.Option(None, "--custom-filter", "-cf", help="Custom filter rules (JSON)"),
+    yocto_machine: Optional[str] = typer.Option(None, "--yocto-machine", help="Yocto MACHINE variable"),
+    yocto_distro: Optional[str] = typer.Option(None, "--yocto-distro", help="Yocto DISTRO variable"),
+    kernel_version: Optional[str] = typer.Option(None, "--kernel-version", help="Kernel version string"),
     version: Optional[str] = typer.Option(None, "--version", "-v", help="Version label (default: timestamp)"),
     project_id: Optional[str] = typer.Option(None, "--project", "-p", help="Project ID (overrides active project)"),
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, quiet"),
@@ -66,6 +70,10 @@ def run_scan(
     if dtb is None:
         dtb = _auto_detect_file_glob(["*.dts", "*.dtb"])
 
+    # Auto-detect custom filter if not provided
+    if custom_filter is None:
+        custom_filter = _auto_detect_file(["custom_filter.json"])
+
     proj_id = project_id or config.active_project_id
     if not proj_id:
         console.print(
@@ -81,13 +89,14 @@ def run_scan(
     sbom_format = _detect_format(sbom, sbom_raw)
     kconfig_raw = kconfig.read_text(errors="replace") if kconfig else ""
     dtb_raw = dtb.read_text(errors="replace") if dtb else ""
+    custom_filter_raw = custom_filter.read_text(errors="replace") if custom_filter else ""
 
     # Check local cache for matching inputs
     from sciath_cli import cache as _cache
 
     cached_scan_id = None
     if not no_cache:
-        cached_scan_id = _cache.get_cached_scan(proj_id, sbom_raw, kconfig_raw, dtb_raw)
+        cached_scan_id = _cache.get_cached_scan(proj_id, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
 
     # Idempotency key: hash of project + version + sbom content
     idem_key = hashlib.sha256(f"{proj_id}:{version}:{sbom_raw}".encode()).hexdigest()[:32]
@@ -131,6 +140,10 @@ def run_scan(
                     sbom_format=sbom_format,
                     kconfig_raw=kconfig_raw,
                     dtb_raw=dtb_raw,
+                    custom_filter_raw=custom_filter_raw,
+                    yocto_machine=yocto_machine or "",
+                    yocto_distro=yocto_distro or "",
+                    kernel_version=kernel_version or "",
                     idempotency_key=idem_key,
                 )
             except SciathAPIError as exc:
@@ -155,7 +168,7 @@ def run_scan(
         raise typer.Exit(1)
 
     # Save to local cache for future runs with same inputs
-    _cache.save_cache(proj_id, sbom_raw, kconfig_raw, dtb_raw, str(result.get("id", "")))
+    _cache.save_cache(proj_id, sbom_raw, kconfig_raw, dtb_raw, str(result.get("id", "")), custom_filter_raw)
 
     formatter.render_scan(result, assessments=assessments)
     raise typer.Exit(formatter.exit_code)
@@ -283,15 +296,20 @@ def list_scans(
     table.add_column("Components", justify="right")
     table.add_column("CVEs", justify="right")
     table.add_column("Suppressed", justify="right")
+    table.add_column("Remaining", justify="right")
     table.add_column("ID", style="dim")
 
     for s in items:
+        total = s.get("total_vulnerabilities", 0)
+        suppressed = s.get("suppressed_count", 0)
+        remaining = s.get("remaining_count", total - suppressed)
         table.add_row(
             s.get("version_label", ""),
             s.get("status", ""),
             str(s.get("total_components", 0)),
-            str(s.get("total_vulnerabilities", 0)),
-            str(s.get("suppressed_count", 0)),
+            str(total),
+            str(suppressed),
+            str(remaining),
             s["id"][:8],
         )
 
@@ -368,6 +386,19 @@ def _auto_detect_file_glob(patterns: list[str]) -> Optional[Path]:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+def _quality_grade(score: float) -> str:
+    """Convert a 0.0-1.0 quality score to a letter grade."""
+    if score >= 0.9:
+        return "A"
+    if score >= 0.8:
+        return "B"
+    if score >= 0.7:
+        return "C"
+    if score >= 0.6:
+        return "D"
+    return "F"
+
+
 def _detect_format(path: Path, raw: str) -> str:
     """Heuristic SBOM format detection from filename + content."""
     name = path.name.lower()
@@ -381,7 +412,7 @@ def _detect_format(path: Path, raw: str) -> str:
 def _display_scan_summary(data: dict) -> None:
     total = data.get("total_vulnerabilities", 0)
     suppressed = data.get("suppressed_count", 0)
-    remaining = total - suppressed
+    remaining = data.get("remaining_count", total - suppressed)
     pct = round(suppressed / total * 100) if total > 0 else 0
 
     table = Table(title="SCAN SUMMARY", box=None, show_header=False, padding=(0, 2))
@@ -395,6 +426,11 @@ def _display_scan_summary(data: dict) -> None:
     table.add_row("Status:", data.get("status", "").upper())
     table.add_row("Version:", data.get("version_label", ""))
     table.add_row("Scan ID:", str(data.get("id", ""))[:8])
+
+    quality = data.get("sbom_quality_score")
+    if quality is not None:
+        grade = _quality_grade(quality)
+        table.add_row("SBOM Quality:", f"{quality:.0%} ({grade})")
 
     console.print()
     console.print(table)

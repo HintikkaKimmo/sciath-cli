@@ -16,19 +16,31 @@ CACHE_DIR = Path.home() / ".sciath" / "cache"
 DEFAULT_TTL = 3600  # 1 hour
 
 
-def _cache_key(project_id: str, sbom_raw: str, kconfig_raw: str, dtb_raw: str) -> str:
+def _cache_key(
+    project_id: str,
+    sbom_raw: str,
+    kconfig_raw: str,
+    dtb_raw: str,
+    custom_filter_raw: str = "",
+) -> str:
     """Compute a cache key from input content."""
-    content = f"{project_id}:{sbom_raw}:{kconfig_raw}:{dtb_raw}"
+    content = f"{project_id}:{sbom_raw}:{kconfig_raw}:{dtb_raw}:{custom_filter_raw}"
     return hashlib.sha256(content.encode()).hexdigest()[:32]
 
 
-def get_cached_scan(project_id: str, sbom_raw: str, kconfig_raw: str = "", dtb_raw: str = "") -> str | None:
+def get_cached_scan(
+    project_id: str,
+    sbom_raw: str,
+    kconfig_raw: str = "",
+    dtb_raw: str = "",
+    custom_filter_raw: str = "",
+) -> str | None:
     """
     Check if a scan with matching inputs was recently uploaded.
 
     Returns scan_id if cache hit, None if miss or expired.
     """
-    key = _cache_key(project_id, sbom_raw, kconfig_raw, dtb_raw)
+    key = _cache_key(project_id, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
     cache_file = CACHE_DIR / f"{key}.json"
 
     if not cache_file.exists():
@@ -45,10 +57,17 @@ def get_cached_scan(project_id: str, sbom_raw: str, kconfig_raw: str = "", dtb_r
         return None
 
 
-def save_cache(project_id: str, sbom_raw: str, kconfig_raw: str, dtb_raw: str, scan_id: str) -> None:
+def save_cache(
+    project_id: str,
+    sbom_raw: str,
+    kconfig_raw: str,
+    dtb_raw: str,
+    scan_id: str,
+    custom_filter_raw: str = "",
+) -> None:
     """Save a scan result to the local cache. Also cleans up expired entries."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    key = _cache_key(project_id, sbom_raw, kconfig_raw, dtb_raw)
+    key = _cache_key(project_id, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
     cache_file = CACHE_DIR / f"{key}.json"
 
     data = {

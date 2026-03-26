@@ -5,6 +5,40 @@ All notable changes to sciath-cli will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-03-26
+
+### Added
+
+- **Custom filter upload.** New `--custom-filter` / `-cf` option on `sciath scan run`
+  to upload organisational CVE filter rules (JSON). Auto-detects `custom_filter.json`
+  in the current directory.
+- **Yocto metadata.** New `--yocto-machine`, `--yocto-distro`, and `--kernel-version`
+  options on `sciath scan run` for improved build-system-aware filtering.
+- **SBOM quality score.** Scan summary now shows SBOM quality score and letter grade
+  (A-F) when the server provides it.
+- **Assessment CVSS and EPSS columns.** `sciath assess list` now shows CVSS score,
+  EPSS exploit probability, and source confidence tier alongside each finding.
+- **Filter layer filtering.** New `--filter-layer` option on `sciath assess list`
+  to filter by specific suppression layer (kconfig, dtb, busybox, packageconfig,
+  patch, custom, build_time, deployment).
+- **Remaining count.** Scan list and summary now show server-provided remaining CVE
+  count alongside suppressed count.
+- **Applied filter layers in explain mode.** Filter reasoning table now shows all
+  layers that contributed to multi-layer assessments.
+- **Enriched JSON output.** JSON mode now includes `epss_score`, `matched_sources`,
+  `confidence_tier`, `applied_filter_layers`, `contextual_cvss`, and
+  `sbom_quality_score` fields.
+
+### Changed
+
+- Assessment list displays 8 columns (was 5): CVE ID, CVSS, Status, Filter Layer,
+  Confidence, EPSS, Sources, ID.
+- Scan list displays 7 columns (was 6): added Remaining.
+- Cache key now includes custom filter content — changing the filter invalidates
+  the cache correctly.
+
+[0.2.0]: https://github.com/HintikkaKimmo/sciath-cli/releases/tag/v0.2.0
+
 ## [0.1.0] - 2026-03-24
 
 ### Added
