@@ -146,6 +146,7 @@ class SciathAPI:
         kconfig_raw: str = "",
         dtb_raw: str = "",
         custom_filter_raw: str = "",
+        policy_name: Optional[str] = None,
         yocto_machine: str = "",
         yocto_distro: str = "",
         kernel_version: str = "",
@@ -164,7 +165,9 @@ class SciathAPI:
         }
         if dtb_raw:
             payload["dtb_raw"] = dtb_raw
-        if custom_filter_raw:
+        if policy_name:
+            payload["policy_name"] = policy_name
+        elif custom_filter_raw:
             payload["custom_filter_raw"] = custom_filter_raw
         if yocto_machine:
             payload["yocto_machine"] = yocto_machine
@@ -246,6 +249,53 @@ class SciathAPI:
         if response.status_code >= 400:
             raise ServerError(f"Export failed ({response.status_code})", status_code=response.status_code)
         return response.content
+
+    # ── Policies ──────────────────────────────────────────────────────────
+
+    def list_policies(self, search: Optional[str] = None, limit: int = 100) -> dict:
+        params: dict = {"limit": limit}
+        if search:
+            params["search"] = search
+        return self._request("GET", "policies/v1/filter-policies/", params=params)
+
+    def get_policy(self, policy_id: str) -> dict:
+        return self._request("GET", f"policies/v1/filter-policies/{policy_id}/")
+
+    def create_policy(self, name: str, content: dict, description: str = "") -> dict:
+        return self._request(
+            "POST", "policies/v1/filter-policies/",
+            json={"name": name, "description": description, "content_raw": content},
+        )
+
+    def update_policy(self, policy_id: str, payload: dict) -> dict:
+        return self._request(
+            "PUT", f"policies/v1/filter-policies/{policy_id}/",
+            json=payload,
+        )
+
+    def delete_policy(self, policy_id: str) -> dict:
+        return self._request("DELETE", f"policies/v1/filter-policies/{policy_id}/")
+
+    def policy_history(self, policy_id: str, limit: int = 50) -> dict:
+        return self._request(
+            "GET", f"policies/v1/filter-policies/{policy_id}/history/",
+            params={"limit": limit},
+        )
+
+    def import_vex_policy(
+        self, name: str, vex_content: dict, description: str = "", trust_vendor: bool = False,
+    ) -> dict:
+        return self._request(
+            "POST", "policies/v1/filter-policies/from-vex/",
+            json={
+                "name": name,
+                "description": description,
+                "vex_content": vex_content,
+                "trust_vendor": trust_vendor,
+            },
+        )
+
+    # ── Downloads ─────────────────────────────────────────────────────────
 
     def _download(self, url: str) -> bytes:
         """

@@ -40,6 +40,7 @@ def run_scan(
     kconfig: Optional[Path] = typer.Option(None, "--kconfig", "-k", help="Kernel .config file"),
     dtb: Optional[Path] = typer.Option(None, "--dtb", "-d", help="Device Tree Blob file (.dts/.dtb)"),
     custom_filter: Optional[Path] = typer.Option(None, "--custom-filter", "-cf", help="Custom filter rules (JSON)"),
+    policy: Optional[str] = typer.Option(None, "--policy", help="Named filter policy (server-side, replaces --custom-filter)"),
     yocto_machine: Optional[str] = typer.Option(None, "--yocto-machine", help="Yocto MACHINE variable"),
     yocto_distro: Optional[str] = typer.Option(None, "--yocto-distro", help="Yocto DISTRO variable"),
     kernel_version: Optional[str] = typer.Option(None, "--kernel-version", help="Kernel version string"),
@@ -70,8 +71,13 @@ def run_scan(
     if dtb is None:
         dtb = _auto_detect_file_glob(["*.dts", "*.dtb"])
 
-    # Auto-detect custom filter if not provided
-    if custom_filter is None:
+    # --policy and --custom-filter are mutually exclusive
+    if policy and custom_filter:
+        console.print("[red]✗ Cannot use both --policy and --custom-filter. Choose one.[/red]")
+        raise typer.Exit(1)
+
+    # Auto-detect custom filter if not provided (and no policy specified)
+    if custom_filter is None and not policy:
         custom_filter = _auto_detect_file(["custom_filter.json"])
 
     proj_id = project_id or config.active_project_id
@@ -140,7 +146,8 @@ def run_scan(
                     sbom_format=sbom_format,
                     kconfig_raw=kconfig_raw,
                     dtb_raw=dtb_raw,
-                    custom_filter_raw=custom_filter_raw,
+                    custom_filter_raw=custom_filter_raw if not policy else "",
+                    policy_name=policy,
                     yocto_machine=yocto_machine or "",
                     yocto_distro=yocto_distro or "",
                     kernel_version=kernel_version or "",
