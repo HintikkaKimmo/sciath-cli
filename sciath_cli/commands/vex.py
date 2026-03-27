@@ -9,7 +9,7 @@ from sciath_cli.console import console
 
 app = typer.Typer(help="Export CycloneDX SBOM or VEX documents directly (no report record created).")
 
-_VALID_FORMATS = {"vex_cdx", "sbom_cdx", "sbom_vex_cdx", "sarif"}
+_VALID_FORMATS = {"vex_cdx", "sbom_cdx", "sbom_vex_cdx", "sbom_spdx", "sarif"}
 
 
 @app.command()

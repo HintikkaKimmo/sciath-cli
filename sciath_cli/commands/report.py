@@ -16,6 +16,7 @@ _FORMAT_MAP = {
     "pdf":  "article13",
     "vex":  "vex_cdx",
     "csaf": "vex_csaf",
+    "spdx": "sbom_spdx",
 }
 _POLL_INTERVAL = 3   # seconds between status polls
 _POLL_MAX      = 60  # max polls (3 min ceiling)
@@ -25,14 +26,14 @@ _POLL_MAX      = 60  # max polls (3 min ceiling)
 @requires_auth
 def report(
     scan_id: str = typer.Argument(..., help="Scan ID to generate a report for"),
-    fmt: str = typer.Option("pdf", "--format", "-f", help="Output format: pdf, vex, csaf"),
+    fmt: str = typer.Option("pdf", "--format", "-f", help="Output format: pdf, vex, csaf, spdx"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
     config=None,
 ):
     """Generate and download a compliance report (Article 13 PDF, CycloneDX VEX, CSAF)."""
     api_format = _FORMAT_MAP.get(fmt)
     if not api_format:
-        console.print(f"[red]✗ Unknown format '{fmt}'. Choose: pdf, vex, csaf[/red]")
+        console.print(f"[red]✗ Unknown format '{fmt}'. Choose: pdf, vex, csaf, spdx[/red]")
         raise typer.Exit(1)
 
     with SciathAPI(config) as api:
