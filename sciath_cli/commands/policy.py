@@ -4,7 +4,7 @@ Policy commands: list, show, create, update, delete, history, import-vex, merge.
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.table import Table
@@ -20,8 +20,8 @@ app = typer.Typer(help="Manage filter policies.")
 @requires_auth
 def list_policies(
     search: Optional[str] = typer.Option(None, "--search", "-s", help="Filter by name"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """List filter policies for the current customer."""
     with SciathAPI(config) as api:
         try:
@@ -58,8 +58,8 @@ def list_policies(
 @requires_auth
 def show(
     name: str = typer.Argument(..., help="Policy name or ID"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Show a policy's details and rules."""
     policy = _find_policy(config, name)
     if not policy:
@@ -93,8 +93,8 @@ def create(
     name: str = typer.Argument(..., help="Policy name"),
     file: Path = typer.Option(..., "--file", "-f", help="Path to custom_filter.json"),
     description: str = typer.Option("", "--description", "-d", help="Policy description"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Create a new filter policy from a JSON file."""
     if not file.exists():
         console.print(f"[red]✗ File not found: {file}[/red]")
@@ -125,8 +125,8 @@ def create(
 def update(
     name: str = typer.Argument(..., help="Policy name"),
     file: Path = typer.Option(..., "--file", "-f", help="Path to updated custom_filter.json"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Update a policy's content. Bumps version and logs history."""
     policy = _find_policy(config, name)
     if not policy:
@@ -160,8 +160,8 @@ def update(
 def delete(
     name: str = typer.Argument(..., help="Policy name"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Delete a filter policy."""
     policy = _find_policy(config, name)
     if not policy:
@@ -186,8 +186,8 @@ def delete(
 @requires_auth
 def history(
     name: str = typer.Argument(..., help="Policy name"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Show version history for a policy."""
     policy = _find_policy(config, name)
     if not policy:
@@ -231,8 +231,8 @@ def import_vex(
     file: Path = typer.Option(..., "--file", "-f", help="Path to CycloneDX VEX document"),
     description: str = typer.Option("", "--description", "-d", help="Policy description"),
     trust_vendor: bool = typer.Option(False, "--trust-vendor", help="Elevate confidence to HIGH (requires admin)"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Import a CycloneDX VEX document as a filter policy."""
     if not file.exists():
         console.print(f"[red]✗ File not found: {file}[/red]")
@@ -268,14 +268,14 @@ def import_vex(
 def merge(
     names: list[str] = typer.Argument(..., help="Policy names to merge"),
     output: Path = typer.Option("merged_policy.json", "--output", "-o", help="Output file"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Merge multiple policies into a single JSON file (client-side composition)."""
     if len(names) < 2:
         console.print("[red]✗ Need at least 2 policy names to merge.[/red]")
         raise typer.Exit(1)
 
-    all_rules: list[dict] = []
+    all_rules: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
 
     with SciathAPI(config) as api:
@@ -330,7 +330,7 @@ def merge(
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 
-def _find_policy(config, name_or_id: str) -> Optional[dict]:
+def _find_policy(config: Any, name_or_id: str) -> Optional[dict[str, Any]]:
     """Look up a policy by name (case-insensitive) or ID prefix."""
     with SciathAPI(config) as api:
         try:
@@ -350,4 +350,5 @@ def _find_policy(config, name_or_id: str) -> Optional[dict]:
         console.print(f"[red]✗ Policy not found: {name_or_id}[/red]")
         return None
 
-    return match
+    found: dict[str, Any] = match
+    return found

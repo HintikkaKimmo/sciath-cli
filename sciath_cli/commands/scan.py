@@ -12,7 +12,7 @@ Output flow:
 import hashlib
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -52,8 +52,8 @@ def run_scan(
     severity_threshold: str = typer.Option("", "--severity-threshold", help="Exit 1 if findings >= threshold (critical/high/medium/low)"),
     fail_on_kev: bool = typer.Option(False, "--fail-on-kev", help="Exit 1 if any CISA KEV finding is open"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Skip local cache, force fresh upload"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Run a vulnerability scan on a firmware SBOM."""
     # Auto-detect SBOM if not provided
     if sbom is None:
@@ -115,6 +115,9 @@ def run_scan(
         severity_threshold=severity_threshold,
         fail_on_kev=fail_on_kev,
     )
+
+    result: dict[str, Any] | None = None
+    assessments: list[dict[str, Any]] | None = None
 
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console) as progress:
         task = progress.add_task("  Uploading artifacts...", total=None)
@@ -184,7 +187,7 @@ def run_scan(
     raise typer.Exit(formatter.exit_code)
 
 
-def _run_analyse_with_retry(api: SciathAPI, scan_id: str, progress, task) -> Optional[dict]:
+def _run_analyse_with_retry(api: SciathAPI, scan_id: str, progress: Any, task: Any) -> Optional[dict[str, Any]]:
     """
     Dispatch analysis then poll until a terminal status is reached.
 
@@ -245,8 +248,8 @@ def _run_analyse_with_retry(api: SciathAPI, scan_id: str, progress, task) -> Opt
 def reanalyse(
     scan_id: str = typer.Argument(..., help="Scan ID or prefix"),
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, quiet"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Re-run analysis on an existing scan (e.g. after a previous failure)."""
     formatter = OutputFormatter(format=output_format)
 
@@ -266,8 +269,8 @@ def reanalyse(
 @requires_auth
 def status(
     scan_id: str = typer.Argument(..., help="Scan ID or prefix"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Check the status of a scan."""
     with SciathAPI(config) as api:
         try:
@@ -283,8 +286,8 @@ def status(
 @requires_auth
 def list_scans(
     project_id: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """List recent scans."""
     proj_id = project_id or config.active_project_id
 
@@ -419,7 +422,7 @@ def _detect_format(path: Path, raw: str) -> str:
     return "cyclonedx"
 
 
-def _display_scan_summary(data: dict) -> None:
+def _display_scan_summary(data: dict[str, Any]) -> None:
     total = data.get("total_vulnerabilities", 0)
     suppressed = data.get("suppressed_count", 0)
     remaining = data.get("remaining_count", total - suppressed)

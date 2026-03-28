@@ -17,6 +17,7 @@ Tools:
 
 import json
 import logging
+from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -38,8 +39,8 @@ def _get_api() -> SciathAPI:
     return SciathAPI(config)
 
 
-@server.list_tools()
-async def list_tools():
+@server.list_tools()  # type: ignore[no-untyped-call,untyped-decorator]
+async def list_tools() -> list[Tool]:
     return [
         Tool(
             name="scan_sbom",
@@ -93,8 +94,8 @@ async def list_tools():
     ]
 
 
-@server.call_tool()
-async def call_tool(name: str, arguments: dict):
+@server.call_tool()  # type: ignore[untyped-decorator]
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     try:
         if name == "scan_sbom":
             return await _tool_scan_sbom(arguments)
@@ -112,7 +113,7 @@ async def call_tool(name: str, arguments: dict):
         return [TextContent(type="text", text=f"API error: {e}")]
 
 
-async def _tool_scan_sbom(args: dict):
+async def _tool_scan_sbom(args: dict[str, Any]) -> list[TextContent]:
     import hashlib
     import time
     from pathlib import Path
@@ -170,7 +171,7 @@ async def _tool_scan_sbom(args: dict):
         api.close()
 
 
-async def _tool_get_scan_status(args: dict):
+async def _tool_get_scan_status(args: dict[str, Any]) -> list[TextContent]:
     api = _get_api()
     try:
         data = api.get_scan_status(args["scan_id"])
@@ -179,7 +180,7 @@ async def _tool_get_scan_status(args: dict):
         api.close()
 
 
-async def _tool_list_findings(args: dict):
+async def _tool_list_findings(args: dict[str, Any]) -> list[TextContent]:
     api = _get_api()
     try:
         params = {"scan_id": args["scan_id"], "limit": args.get("limit", 50)}
@@ -209,7 +210,7 @@ async def _tool_list_findings(args: dict):
         api.close()
 
 
-async def _tool_get_compliance_status(args: dict):
+async def _tool_get_compliance_status(args: dict[str, Any]) -> list[TextContent]:
     """Proxy to the project detail — fetch latest scan stats."""
     api = _get_api()
     try:
@@ -237,7 +238,7 @@ async def _tool_get_compliance_status(args: dict):
         api.close()
 
 
-async def run_server():
+async def run_server() -> None:
     """Start the MCP server with stdio transport."""
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())

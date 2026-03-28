@@ -1,7 +1,7 @@
 """Report command — download compliance reports from the Sciath API."""
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -28,8 +28,8 @@ def report(
     scan_id: str = typer.Argument(..., help="Scan ID to generate a report for"),
     fmt: str = typer.Option("pdf", "--format", "-f", help="Output format: pdf, vex, csaf, spdx"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Generate and download a compliance report (Article 13 PDF, CycloneDX VEX, CSAF)."""
     api_format = _FORMAT_MAP.get(fmt)
     if not api_format:

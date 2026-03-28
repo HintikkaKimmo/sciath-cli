@@ -1,7 +1,7 @@
 """
 Assessment commands: list, approve, reject.
 """
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.table import Table
@@ -19,8 +19,8 @@ def list_assessments(
     scan_id: Optional[str] = typer.Argument(None, help="Scan ID or prefix to filter by"),
     pending_only: bool = typer.Option(True, "--pending/--all", help="Show only assessments needing review"),
     filter_layer: Optional[str] = typer.Option(None, "--filter-layer", help="Filter by layer (kconfig/dtb/busybox/packageconfig/patch/custom/build_time/deployment)"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """List vulnerability assessments for a scan."""
     with SciathAPI(config) as api:
         try:
@@ -74,8 +74,8 @@ def list_assessments(
 def approve(
     assessment_id: str = typer.Argument(..., help="Assessment ID or prefix"),
     note: Optional[str] = typer.Option(None, "--note", "-n", help="Optional review note"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Approve an assessment (confirm CVE is not applicable)."""
     with SciathAPI(config) as api:
         try:
@@ -92,8 +92,8 @@ def approve(
 def reject(
     assessment_id: str = typer.Argument(..., help="Assessment ID or prefix"),
     note: Optional[str] = typer.Option(None, "--note", "-n", help="Reason for rejection"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """Reject an assessment (flag CVE for manual review)."""
     with SciathAPI(config) as api:
         try:

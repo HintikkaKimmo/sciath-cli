@@ -32,7 +32,7 @@ class NotFoundError(SciathAPIError):
 
 class ValidationError(SciathAPIError):
     """422 — request validation failed."""
-    def __init__(self, message: str, field_errors: Optional[list] = None):
+    def __init__(self, message: str, field_errors: Optional[list[Any]] = None):
         super().__init__(message)
         self.field_errors = field_errors or []
 
@@ -65,15 +65,15 @@ class SciathAPI:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self):
+    def __enter__(self) -> "SciathAPI":
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, *_: Any) -> None:
         self.close()
 
     # ── Internal ────────────────────────────────────────────────────────────
 
-    def _request(self, method: str, path: str, **kwargs) -> Any:
+    def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         """
         Execute an HTTP request and raise typed exceptions on failure.
 
@@ -108,22 +108,23 @@ class SciathAPI:
                 f"Server error ({response.status_code})", status_code=response.status_code
             )
 
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     # ── Auth ────────────────────────────────────────────────────────────────
 
-    def request_device_code(self) -> dict:
+    def request_device_code(self) -> dict[str, Any]:
         return self._request("POST", "auth/v1/device/code", json={"client_name": "Sciath CLI"})
 
-    def poll_device_token(self, poll_code: str) -> dict:
+    def poll_device_token(self, poll_code: str) -> dict[str, Any]:
         return self._request("GET", "auth/v1/device/token", params={"poll_code": poll_code})
 
     # ── Projects ────────────────────────────────────────────────────────────
 
-    def list_projects(self, limit: int = 100) -> dict:
+    def list_projects(self, limit: int = 100) -> dict[str, Any]:
         return self._request("GET", "core/v1/projects/", params={"limit": limit})
 
-    def create_project(self, customer_id: str, name: str, **kwargs) -> dict:
+    def create_project(self, customer_id: str, name: str, **kwargs: Any) -> dict[str, Any]:
         return self._request(
             "POST", "core/v1/projects/",
             json={"customer_id": customer_id, "name": name, **kwargs},
@@ -131,8 +132,8 @@ class SciathAPI:
 
     # ── Scans ───────────────────────────────────────────────────────────────
 
-    def list_scans(self, project_id: Optional[str] = None, limit: int = 20) -> dict:
-        params: dict = {"limit": limit}
+    def list_scans(self, project_id: Optional[str] = None, limit: int = 20) -> dict[str, Any]:
+        params: dict[str, Any] = {"limit": limit}
         if project_id:
             params["project_id"] = project_id
         return self._request("GET", "core/v1/scans/", params=params)
@@ -152,12 +153,12 @@ class SciathAPI:
         yocto_distro: str = "",
         kernel_version: str = "",
         idempotency_key: Optional[str] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         headers = {}
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
 
-        payload: dict = {
+        payload: dict[str, Any] = {
             "project_id": project_id,
             "version_label": version_label,
             "sbom_raw": sbom_raw,
@@ -185,10 +186,10 @@ class SciathAPI:
             headers=headers,
         )
 
-    def trigger_analyse(self, scan_id: str) -> dict:
+    def trigger_analyse(self, scan_id: str) -> dict[str, Any]:
         return self._request("POST", f"scans/v1/{scan_id}/analyse/")
 
-    def get_scan_status(self, scan_id: str) -> dict:
+    def get_scan_status(self, scan_id: str) -> dict[str, Any]:
         return self._request("GET", f"scans/v1/{scan_id}/status/")
 
     # ── Assessments ─────────────────────────────────────────────────────────
@@ -199,8 +200,8 @@ class SciathAPI:
         status: Optional[str] = None,
         filter_layer: Optional[str] = None,
         limit: int = 50,
-    ) -> dict:
-        params: dict = {"limit": limit}
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {"limit": limit}
         if scan_id:
             params["scan_id"] = scan_id
         if status:
@@ -209,7 +210,7 @@ class SciathAPI:
             params["filter_layer"] = filter_layer
         return self._request("GET", "assessments/v1/assessments/", params=params)
 
-    def update_assessment(self, assessment_id: str, payload: dict) -> dict:
+    def update_assessment(self, assessment_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._request(
             "PATCH", f"assessments/v1/assessments/{assessment_id}/",
             json=payload,
@@ -217,15 +218,15 @@ class SciathAPI:
 
     # ── Reports ─────────────────────────────────────────────────────────────
 
-    def generate_report(self, scan_id: str, fmt: str) -> dict:
+    def generate_report(self, scan_id: str, fmt: str) -> dict[str, Any]:
         """POST /reports/v1/scans/{scan_id}/generate/ → report metadata dict."""
         return self._request("POST", f"reports/v1/scans/{scan_id}/generate/", json={"format": fmt})
 
-    def get_report(self, report_id: str) -> dict:
+    def get_report(self, report_id: str) -> dict[str, Any]:
         """GET /reports/v1/{report_id}/ → report metadata + status."""
         return self._request("GET", f"reports/v1/{report_id}/")
 
-    def get_report_download_url(self, report_id: str) -> dict:
+    def get_report_download_url(self, report_id: str) -> dict[str, Any]:
         """
         GET /reports/v1/{report_id}/download/ → {"url": "...", "expires_in": 900}
         Returns the JSON metadata dict; caller fetches the URL separately.
@@ -255,39 +256,39 @@ class SciathAPI:
 
     # ── Policies ──────────────────────────────────────────────────────────
 
-    def list_policies(self, search: Optional[str] = None, limit: int = 100) -> dict:
-        params: dict = {"limit": limit}
+    def list_policies(self, search: Optional[str] = None, limit: int = 100) -> dict[str, Any]:
+        params: dict[str, Any] = {"limit": limit}
         if search:
             params["search"] = search
         return self._request("GET", "policies/v1/filter-policies/", params=params)
 
-    def get_policy(self, policy_id: str) -> dict:
+    def get_policy(self, policy_id: str) -> dict[str, Any]:
         return self._request("GET", f"policies/v1/filter-policies/{policy_id}/")
 
-    def create_policy(self, name: str, content: dict, description: str = "") -> dict:
+    def create_policy(self, name: str, content: dict[str, Any], description: str = "") -> dict[str, Any]:
         return self._request(
             "POST", "policies/v1/filter-policies/",
             json={"name": name, "description": description, "content_raw": content},
         )
 
-    def update_policy(self, policy_id: str, payload: dict) -> dict:
+    def update_policy(self, policy_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._request(
             "PUT", f"policies/v1/filter-policies/{policy_id}/",
             json=payload,
         )
 
-    def delete_policy(self, policy_id: str) -> dict:
+    def delete_policy(self, policy_id: str) -> dict[str, Any]:
         return self._request("DELETE", f"policies/v1/filter-policies/{policy_id}/")
 
-    def policy_history(self, policy_id: str, limit: int = 50) -> dict:
+    def policy_history(self, policy_id: str, limit: int = 50) -> dict[str, Any]:
         return self._request(
             "GET", f"policies/v1/filter-policies/{policy_id}/history/",
             params={"limit": limit},
         )
 
     def import_vex_policy(
-        self, name: str, vex_content: dict, description: str = "", trust_vendor: bool = False,
-    ) -> dict:
+        self, name: str, vex_content: dict[str, Any], description: str = "", trust_vendor: bool = False,
+    ) -> dict[str, Any]:
         return self._request(
             "POST", "policies/v1/filter-policies/from-vex/",
             json={

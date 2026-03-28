@@ -21,7 +21,7 @@ app = typer.Typer(help="Authentication commands.")
 @app.command()
 def login(
     api_url: str = typer.Option(None, "--api-url", envvar="SCIATH_API_URL", help="API base URL"),
-):
+) -> None:
     """Authenticate with Sciath via browser."""
     config = load_config()
     if api_url:
@@ -89,14 +89,14 @@ def login(
 
 
 @app.command()
-def logout():
+def logout() -> None:
     """Clear stored credentials."""
     clear_config()
     console.print("[green]✓[/green] Logged out")
 
 
 @app.command()
-def whoami():
+def whoami() -> None:
     """Show current authenticated user."""
     config = load_config()
     if not config.api_key:

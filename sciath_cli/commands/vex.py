@@ -1,6 +1,6 @@
 """vex — direct CycloneDX export from the CLI."""
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 
@@ -21,8 +21,8 @@ def vex(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
     validate: bool = typer.Option(False, "--validate",
                                   help="Validate output against CycloneDX 1.5 schema"),
-    config=None,
-):
+    config: Any = None,
+) -> None:
     """
     Export a CycloneDX document directly (no report record created).
 

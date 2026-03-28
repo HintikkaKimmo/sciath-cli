@@ -51,7 +51,8 @@ def get_cached_scan(
         if time.time() - data.get("timestamp", 0) > DEFAULT_TTL:
             cache_file.unlink(missing_ok=True)
             return None
-        return data.get("scan_id")
+        scan_id: str | None = data.get("scan_id")
+        return scan_id
     except (json.JSONDecodeError, OSError):
         cache_file.unlink(missing_ok=True)
         return None

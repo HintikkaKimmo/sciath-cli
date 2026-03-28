@@ -8,10 +8,11 @@ Precedence for api_url (highest → lowest):
 """
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional, TypeVar
 
 import typer
 from pydantic import BaseModel
+from typing_extensions import ParamSpec
 
 CONFIG_DIR = Path.home() / ".sciath"
 CONFIG_FILE = CONFIG_DIR / "config.json"
@@ -56,7 +57,11 @@ def clear_config() -> None:
         CONFIG_FILE.unlink()
 
 
-def requires_auth(func):
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def requires_auth(func: Callable[P, R]) -> Callable[..., R]:
     """
     Decorator for commands that need a valid API key.
 
@@ -70,7 +75,7 @@ def requires_auth(func):
     from functools import wraps
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> R:
         config = load_config()
         if not config.api_key:
             from rich.console import Console
@@ -78,12 +83,12 @@ def requires_auth(func):
                 "[red]Not authenticated.[/red] Run [bold]sciath login[/bold] first."
             )
             raise typer.Exit(1)
-        return func(*args, config=config, **kwargs)
+        return func(*args, config=config, **kwargs)  # type: ignore[arg-type]
 
     # Remove `config` from the signature Typer introspects — it's injected
     # by this decorator, not parsed from the CLI.
     sig = inspect.signature(func)
     params = [p for p in sig.parameters.values() if p.name != "config"]
-    wrapper.__signature__ = sig.replace(parameters=params)
+    wrapper.__signature__ = sig.replace(parameters=params)  # type: ignore[attr-defined]
 
     return wrapper

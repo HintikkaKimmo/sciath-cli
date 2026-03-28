@@ -38,7 +38,7 @@ cache_app = typer.Typer(help="Manage the local scan cache.")
 
 
 @cache_app.command("clear")
-def cache_clear():
+def cache_clear() -> None:
     """Remove all cached scan results."""
     from sciath_cli.cache import clear_all
     from sciath_cli.console import console
@@ -50,7 +50,7 @@ app.add_typer(cache_app, name="cache")
 
 
 @app.command("mcp")
-def mcp_server():
+def mcp_server() -> None:
     """Start MCP server for editor integration (Claude Code, Cursor, etc.)."""
     import asyncio
 
@@ -61,7 +61,7 @@ def mcp_server():
 @app.callback(invoke_without_command=True)
 def version_flag(
     version: bool = typer.Option(False, "--version", "-V", help="Show version and exit", is_eager=True),
-):
+) -> None:
     if version:
         typer.echo(f"sciath {__version__}")
         raise typer.Exit()

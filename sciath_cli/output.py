@@ -15,6 +15,7 @@ Architecture:
 import json
 import sys
 from dataclasses import dataclass
+from typing import Any
 
 from rich.table import Table
 
@@ -51,7 +52,7 @@ class OutputFormatter:
     fail_on_kev: bool = False
     exit_code: int = 0
 
-    def render_scan(self, data: dict, assessments: list | None = None) -> None:
+    def render_scan(self, data: dict[str, Any], assessments: list[dict[str, Any]] | None = None) -> None:
         """Render scan results in the chosen format."""
         if self.format == "quiet":
             self._compute_exit_code(data, assessments)
@@ -64,7 +65,7 @@ class OutputFormatter:
 
         self._compute_exit_code(data, assessments)
 
-    def _compute_exit_code(self, data: dict, assessments: list | None) -> None:
+    def _compute_exit_code(self, data: dict[str, Any], assessments: list[dict[str, Any]] | None) -> None:
         """Set exit_code based on severity threshold and KEV policy."""
         if not self.severity_threshold and not self.fail_on_kev:
             return
@@ -91,7 +92,7 @@ class OutputFormatter:
                         self.exit_code = 1
                         return
 
-    def _render_table(self, data: dict, assessments: list | None) -> None:
+    def _render_table(self, data: dict[str, Any], assessments: list[dict[str, Any]] | None) -> None:
         """Rich table output for TTY."""
         total = data.get("total_vulnerabilities", 0)
         suppressed = data.get("suppressed_count", 0)
@@ -129,7 +130,7 @@ class OutputFormatter:
             console.print(f"    [dim]sciath report {scan_short}[/dim]        # Generate Article 13 report")
         console.print()
 
-    def _render_explain_table(self, assessments: list) -> None:
+    def _render_explain_table(self, assessments: list[dict[str, Any]]) -> None:
         """Show filter reasoning for each assessment."""
         filtered = [a for a in assessments if a.get("filter_layer") and a["filter_layer"] != "none"]
         if not filtered:
@@ -158,13 +159,13 @@ class OutputFormatter:
 
         console.print(table)
 
-    def _render_json(self, data: dict, assessments: list | None) -> None:
+    def _render_json(self, data: dict[str, Any], assessments: list[dict[str, Any]] | None) -> None:
         """Composable JSON output with summary and optional reasoning."""
         total = data.get("total_vulnerabilities", 0)
         suppressed = data.get("suppressed_count", 0)
         remaining = data.get("remaining_count", total - suppressed)
 
-        output: dict = {
+        output: dict[str, Any] = {
             "summary": (
                 f"{remaining} open CVEs out of {total} total. "
                 f"{suppressed} suppressed ({round(suppressed / total * 100) if total else 0}%). "

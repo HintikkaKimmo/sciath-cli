@@ -1,6 +1,8 @@
 """
 Project commands: list, create, select.
 """
+from typing import Any
+
 import typer
 from rich.table import Table
 
@@ -13,7 +15,7 @@ app = typer.Typer(help="Manage projects.")
 
 @app.command("list")
 @requires_auth
-def list_projects(config=None):
+def list_projects(config: Any = None) -> None:
     """List projects for the current customer."""
     with SciathAPI(config) as api:
         try:
@@ -47,7 +49,7 @@ def list_projects(config=None):
 
 @app.command()
 @requires_auth
-def create(name: str = typer.Argument(..., help="Project name"), config=None):
+def create(name: str = typer.Argument(..., help="Project name"), config: Any = None) -> None:
     """Create a new project."""
     with SciathAPI(config) as api:
         try:
@@ -63,7 +65,7 @@ def create(name: str = typer.Argument(..., help="Project name"), config=None):
 
 @app.command()
 @requires_auth
-def select(name: str = typer.Argument(..., help="Project name or ID"), config=None):
+def select(name: str = typer.Argument(..., help="Project name or ID"), config: Any = None) -> None:
     """Set the active project for subsequent commands."""
     with SciathAPI(config) as api:
         try:
@@ -89,7 +91,7 @@ def select(name: str = typer.Argument(..., help="Project name or ID"), config=No
 
 @app.command()
 @requires_auth
-def info(config=None):
+def info(config: Any = None) -> None:
     """Show active project details."""
     if not config.active_project_id:
         console.print("[yellow]No active project.[/yellow] Run [bold]sciath project select <name>[/bold] first.")
