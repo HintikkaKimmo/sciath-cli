@@ -39,6 +39,7 @@ def run_scan(
     sbom: Optional[Path] = typer.Argument(None, help="Path to SBOM file (auto-detected if omitted)"),
     kconfig: Optional[Path] = typer.Option(None, "--kconfig", "-k", help="Kernel .config file"),
     dtb: Optional[Path] = typer.Option(None, "--dtb", "-d", help="Device Tree Blob file (.dts/.dtb)"),
+    depgraph: Optional[Path] = typer.Option(None, "--depgraph", help="Bitbake dependency graph (dot format from bitbake -g)"),
     custom_filter: Optional[Path] = typer.Option(None, "--custom-filter", "-cf", help="Custom filter rules (JSON)"),
     policy: Optional[str] = typer.Option(None, "--policy", help="Named filter policy (server-side, replaces --custom-filter)"),
     yocto_machine: Optional[str] = typer.Option(None, "--yocto-machine", help="Yocto MACHINE variable"),
@@ -95,6 +96,7 @@ def run_scan(
     sbom_format = _detect_format(sbom, sbom_raw)
     kconfig_raw = kconfig.read_text(errors="replace") if kconfig else ""
     dtb_raw = dtb.read_text(errors="replace") if dtb else ""
+    depgraph_raw = depgraph.read_text(errors="replace") if depgraph else ""
     custom_filter_raw = custom_filter.read_text(errors="replace") if custom_filter else ""
 
     # Check local cache for matching inputs
@@ -146,6 +148,7 @@ def run_scan(
                     sbom_format=sbom_format,
                     kconfig_raw=kconfig_raw,
                     dtb_raw=dtb_raw,
+                    depgraph_raw=depgraph_raw,
                     custom_filter_raw=custom_filter_raw if not policy else "",
                     policy_name=policy,
                     yocto_machine=yocto_machine or "",

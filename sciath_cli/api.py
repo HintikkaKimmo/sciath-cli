@@ -145,6 +145,7 @@ class SciathAPI:
         sbom_format: str,
         kconfig_raw: str = "",
         dtb_raw: str = "",
+        depgraph_raw: str = "",
         custom_filter_raw: str = "",
         policy_name: Optional[str] = None,
         yocto_machine: str = "",
@@ -165,6 +166,8 @@ class SciathAPI:
         }
         if dtb_raw:
             payload["dtb_raw"] = dtb_raw
+        if depgraph_raw:
+            payload["depgraph_raw"] = depgraph_raw
         if policy_name:
             payload["policy_name"] = policy_name
         elif custom_filter_raw:
