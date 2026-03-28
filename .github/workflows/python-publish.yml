@@ -1,10 +1,9 @@
-# This workflow will upload a Python Package to PyPI when a release is created
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
+# Publish Python package to PyPI when a GitHub Release is created.
+#
+# Security:
+#   - Trusted publishing via GitHub OIDC (no PyPI tokens stored)
+#   - Sigstore signs the sdist and wheel before upload
+#   - SLSA Level 2 provenance attached to build artifacts
 
 name: Upload Python Package
 
@@ -14,6 +13,8 @@ on:
 
 permissions:
   contents: read
+  id-token: write       # PyPI trusted publishing + Sigstore signing
+  attestations: write   # SLSA provenance
 
 jobs:
   release-build:
@@ -28,9 +29,25 @@ jobs:
 
       - name: Build release distributions
         run: |
-          # NOTE: put your own distribution build steps here.
           python -m pip install build
           python -m build
+
+      # Sign sdist and wheel with Sigstore
+      - name: Sign distributions with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        with:
+          inputs: dist/*.tar.gz dist/*.whl
+
+      # SLSA provenance for the built distributions
+      - name: Attest sdist
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
+
+      - name: Attest wheel
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.whl
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
@@ -43,19 +60,10 @@ jobs:
     needs:
       - release-build
     permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
 
-    # Dedicated environments with protections for publishing are strongly recommended.
-    # For more information, see: https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment#deployment-protection-rules
     environment:
       name: pypi
-      # OPTIONAL: uncomment and update to include your PyPI project URL in the deployment status:
-      # url: https://pypi.org/p/YOURPROJECT
-      #
-      # ALTERNATIVE: if your GitHub Release name is the PyPI project version string
-      # ALTERNATIVE: exactly, uncomment the following line instead:
-      # url: https://pypi.org/project/YOURPROJECT/${{ github.event.release.name }}
 
     steps:
       - name: Retrieve release distributions

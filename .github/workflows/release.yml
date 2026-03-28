@@ -8,7 +8,14 @@
 #   macos/arm64    — macos-latest (Apple Silicon runner)
 #   macos/x86_64   — macos-13 (last Intel runner)
 #
-# Output: one .tar.gz per platform uploaded to the GitHub Release.
+# Security:
+#   - Dependencies installed via uv sync --frozen (hash-verified lockfile)
+#   - pip-audit checks for known vulnerabilities
+#   - Sigstore cosign signs each release artifact (keyless, GitHub OIDC)
+#   - SLSA Level 2 provenance via actions/attest-build-provenance
+#   - CycloneDX SBOM generated per platform (Python-layer only for PyInstaller builds)
+#
+# Output: per-platform .tar.gz + .bundle (Sigstore) + .sbom.cdx.json uploaded to GitHub Release.
 
 name: Release
 
@@ -18,7 +25,9 @@ on:
       - "v*"
 
 permissions:
-  contents: write   # needed to create releases and upload assets
+  contents: write        # create releases and upload assets
+  id-token: write        # Sigstore keyless signing via GitHub OIDC
+  attestations: write    # SLSA provenance attestations
 
 jobs:
   test:
@@ -27,15 +36,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v4
 
-      - name: Install CLI dev dependencies
-        run: pip install -e ".[dev]"
+      - name: Install dependencies (hash-verified lockfile)
+        run: uv sync --frozen --extra dev
 
-      - name: Run CLI tests
-        run: pytest tests/ -v
+      - name: Run tests
+        run: uv run pytest tests/ -v
+
+      - name: Audit dependencies for known vulnerabilities
+        run: uv run pip-audit
 
   build:
     name: Build ${{ matrix.target }}
@@ -66,6 +76,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: astral-sh/setup-uv@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -77,11 +89,11 @@ jobs:
         with:
           platforms: linux/arm64
 
-      - name: Install CLI + PyInstaller
-        run: pip install -e ".[dist]"
+      - name: Install CLI + PyInstaller (hash-verified)
+        run: uv sync --frozen --extra dist
 
       - name: Build binary (--onedir)
-        run: pyinstaller sciath.spec --clean --noconfirm
+        run: uv run pyinstaller sciath.spec --clean --noconfirm
 
       # Smoke test: verify the binary actually runs
       - name: Smoke test binary
@@ -95,11 +107,20 @@ jobs:
           tar -czf "${ARCHIVE}" -C dist sciath
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
 
-      - name: Upload artifact
+      # Generate CycloneDX SBOM (Python-layer only; does not cover bundled interpreter/OS libs)
+      - name: Generate SBOM
+        run: |
+          uv run pip install cyclonedx-bom
+          uv run cyclonedx-py environment --output-format json \
+            --outfile "sciath-${{ matrix.target }}.sbom.cdx.json"
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sciath-${{ matrix.target }}
-          path: ${{ env.ARCHIVE }}
+          path: |
+            ${{ env.ARCHIVE }}
+            sciath-${{ matrix.target }}.sbom.cdx.json
           retention-days: 1
 
   release:
@@ -119,14 +140,75 @@ jobs:
       - name: Generate checksums
         run: |
           cd artifacts
-          sha256sum sciath-*.tar.gz > SHA256SUMS.txt
+          sha256sum sciath-*.tar.gz sciath-*.sbom.cdx.json > SHA256SUMS.txt
           cat SHA256SUMS.txt
+
+      # Sigstore: sign each artifact with cosign (keyless via GitHub OIDC)
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign artifacts with Sigstore
+        run: |
+          cd artifacts
+          for f in sciath-*.tar.gz sciath-*.sbom.cdx.json SHA256SUMS.txt; do
+            cosign sign-blob --yes --bundle "${f}.bundle" "${f}"
+            echo "Signed: ${f}"
+          done
+
+      # SLSA Level 2 provenance for each binary
+      - name: Attest linux-x86_64
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/sciath-linux-x86_64.tar.gz
+
+      - name: Attest linux-aarch64
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/sciath-linux-aarch64.tar.gz
+
+      - name: Attest macos-arm64
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/sciath-macos-arm64.tar.gz
+
+      - name: Attest macos-x86_64
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/sciath-macos-x86_64.tar.gz
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/sciath-*.tar.gz
+            artifacts/sciath-*.tar.gz.bundle
+            artifacts/sciath-*.sbom.cdx.json
+            artifacts/sciath-*.sbom.cdx.json.bundle
             artifacts/SHA256SUMS.txt
+            artifacts/SHA256SUMS.txt.bundle
           generate_release_notes: true
           fail_on_unmatched_files: true
+          body: |
+            ## Verification
+
+            **Sigstore (cosign):**
+            ```bash
+            cosign verify-blob --bundle sciath-linux-x86_64.tar.gz.bundle \
+              --certificate-identity-regexp "github.com/HintikkaKimmo/sciath-cli" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              sciath-linux-x86_64.tar.gz
+            ```
+
+            **SLSA provenance (GitHub CLI):**
+            ```bash
+            gh attestation verify sciath-linux-x86_64.tar.gz --owner HintikkaKimmo
+            ```
+
+            **SHA-256 checksums:**
+            ```bash
+            sha256sum -c SHA256SUMS.txt
+            ```
+
+            **SBOM note:** CLI SBOMs cover Python package dependencies only. The PyInstaller
+            bundle also includes the Python interpreter and platform libraries not captured
+            in the SBOM. For complete dependency visibility, use the Docker image SBOM.

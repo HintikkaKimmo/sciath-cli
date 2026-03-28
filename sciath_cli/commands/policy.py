@@ -275,8 +275,8 @@ def merge(
         console.print("[red]✗ Need at least 2 policy names to merge.[/red]")
         raise typer.Exit(1)
 
-    all_rules = []
-    seen_ids: set = set()
+    all_rules: list[dict] = []
+    seen_ids: set[str] = set()
 
     with SciathAPI(config) as api:
         for name in names:
