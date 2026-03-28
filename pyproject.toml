@@ -43,6 +43,9 @@ dev = [
     "pytest>=8.0.0",
     "pytest-httpx>=0.30.0",
     "pip-audit>=2.7.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pre-commit>=4.0.0",
 ]
 dist = [
     "pyinstaller>=6.0.0",
@@ -57,3 +60,22 @@ path = "sciath_cli/__init__.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+packages = ["sciath_cli"]
+# TODO: enable strict after adding type annotations to Typer commands + API client
+# strict = true
+# warn_return_any = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 130
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]

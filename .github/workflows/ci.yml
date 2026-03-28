@@ -1,0 +1,43 @@
+# CI: lint, type check, test, and audit dependencies.
+#
+# Security:
+#   - uv sync --frozen ensures hash-verified lockfile is authoritative
+#   - pip-audit checks for known vulnerabilities in dependencies
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies (hash-verified lockfile)
+        run: uv sync --frozen --extra dev
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run mypy sciath_cli/
+
+      - name: Test
+        run: uv run pytest tests/ -v
+
+      - name: Audit dependencies
+        run: uv run pip-audit

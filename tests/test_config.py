@@ -3,6 +3,7 @@ Unit tests for config.py: load, save, clear, env var override, @requires_auth.
 """
 
 import pytest
+
 from sciath_cli.config import (
     DEFAULT_API_URL,
     SciathConfig,

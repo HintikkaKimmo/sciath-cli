@@ -5,6 +5,7 @@ Uses httpx.MockTransport to simulate backend responses without a real server.
 """
 import httpx
 import pytest
+
 from sciath_cli.api import (
     AuthError,
     NotFoundError,

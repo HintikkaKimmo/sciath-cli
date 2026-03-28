@@ -5,9 +5,10 @@ import json
 
 import httpx
 import pytest
+from typer.testing import CliRunner
+
 from sciath_cli.config import SciathConfig, load_config, save_config
 from sciath_cli.main import app
-from typer.testing import CliRunner
 
 runner = CliRunner()
 
