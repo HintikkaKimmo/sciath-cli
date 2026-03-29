@@ -50,13 +50,13 @@ def list_assessments(
         return
 
     table = Table(show_header=True, header_style="bold")
-    table.add_column("CVE ID")
+    table.add_column("CVE ID", no_wrap=True)
     table.add_column("CVSS", justify="right")
     table.add_column("Status")
-    table.add_column("Filter Layer")
-    table.add_column("Confidence")
+    table.add_column("Filter", no_wrap=True)
+    table.add_column("Conf.")
     table.add_column("EPSS", justify="right")
-    table.add_column("Sources")
+    table.add_column("Tier")
     table.add_column("ID", style="dim")
 
     for a in items:

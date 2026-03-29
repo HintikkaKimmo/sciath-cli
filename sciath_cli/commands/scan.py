@@ -280,10 +280,11 @@ def _run_analyse_with_retry(api: SciathAPI, scan_id: str, progress: Any, task: A
 def reanalyse(
     scan_id: str = typer.Argument(..., help="Scan ID or prefix"),
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, quiet"),
+    explain: bool = typer.Option(False, "--explain", "-e", help="Show filter reasoning per CVE"),
     config: Any = None,
 ) -> None:
     """Re-run analysis on an existing scan (e.g. after a previous failure)."""
-    formatter = OutputFormatter(format=output_format)
+    formatter = OutputFormatter(format=output_format, explain=explain)
 
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console) as progress:
         task = progress.add_task("  Running analysis...", total=None)
