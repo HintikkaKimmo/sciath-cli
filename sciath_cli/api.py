@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 import httpx
 
-from sciath_cli.config import SciathConfig
+from sciath_cli.config import SciathConfig, save_config
 
 # ─── Exceptions ───────────────────────────────────────────────────────────────
 
@@ -56,9 +56,14 @@ class SciathAPI:
 
     def __init__(self, config: SciathConfig):
         self._config = config
+        headers: dict[str, str] = {}
+        if config.access_token:
+            headers["Authorization"] = f"Bearer {config.access_token}"
+        elif config.api_key:
+            headers["X-API-Key"] = config.api_key
         self._client = httpx.Client(
             base_url=config.api_url,
-            headers={"X-API-Key": config.api_key or ""},
+            headers=headers,
             timeout=90.0,  # scans can take 60s+ on large SBOMs
         )
 
@@ -92,6 +97,12 @@ class SciathAPI:
             raise ServerError(f"Request timed out: {exc}", status_code=0) from exc
 
         if response.status_code == 401:
+            # Auto-refresh OAuth2 token if we have a refresh token.
+            if self._config.refresh_token and not kwargs.get("_no_refresh"):
+                refreshed = self._try_refresh()
+                if refreshed:
+                    # Retry the original request with the new token.
+                    return self._request(method, path, _no_refresh=True, **kwargs)
             raise AuthError("Not authenticated — run [bold]sciath login[/bold]")
         if response.status_code == 403:
             raise ScopeError("Permission denied (missing API key scope)")
@@ -110,6 +121,35 @@ class SciathAPI:
 
         result: dict[str, Any] = response.json()
         return result
+
+    def _try_refresh(self) -> bool:
+        """Attempt to refresh the OAuth2 access token. Returns True on success."""
+        try:
+            response = self._client.post(
+                "/api/auth/v1/token/refresh",
+                json={"refresh_token": self._config.refresh_token},
+            )
+            if response.status_code != 200:
+                return False
+
+            data = response.json()
+            self._config.access_token = data["access_token"]
+            self._config.refresh_token = data["refresh_token"]
+
+            # Calculate expiry timestamp.
+            from datetime import datetime, timedelta, timezone
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
+            self._config.token_expires_at = expires_at.isoformat()
+
+            # Persist updated tokens.
+            save_config(self._config)
+
+            # Update client headers for subsequent requests.
+            self._client.headers["Authorization"] = f"Bearer {data['access_token']}"
+
+            return True
+        except Exception:
+            return False
 
     # ── Auth ────────────────────────────────────────────────────────────────
 

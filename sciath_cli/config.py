@@ -21,11 +21,22 @@ DEFAULT_API_URL = "https://api.sciath.io"
 
 class SciathConfig(BaseModel):
     api_url: str = DEFAULT_API_URL
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None            # Legacy API key (migration compat)
+    access_token: Optional[str] = None       # OAuth2 access token
+    refresh_token: Optional[str] = None      # OAuth2 refresh token
+    token_expires_at: Optional[str] = None   # ISO 8601 expiry timestamp
     user_email: Optional[str] = None
     customer_name: Optional[str] = None
     active_project_id: Optional[str] = None
     active_project_name: Optional[str] = None
+
+    @property
+    def has_oauth2(self) -> bool:
+        return bool(self.access_token)
+
+    @property
+    def has_any_auth(self) -> bool:
+        return bool(self.access_token or self.api_key)
 
 
 def load_config() -> SciathConfig:
@@ -77,7 +88,7 @@ def requires_auth(func: Callable[P, R]) -> Callable[..., R]:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> R:
         config = load_config()
-        if not config.api_key:
+        if not config.has_any_auth:
             from rich.console import Console
             Console().print(
                 "[red]Not authenticated.[/red] Run [bold]sciath login[/bold] first."

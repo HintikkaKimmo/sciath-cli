@@ -66,7 +66,7 @@ def login(
                 except Exception:
                     continue  # transient network error — keep polling
 
-                if result.get("api_key"):
+                if result.get("access_token") or result.get("api_key"):
                     break
                 status = result.get("status", "pending")
                 if status == "expired" or resp.status_code == 410:
@@ -79,13 +79,24 @@ def login(
                 console.print("\n[red]✗ Authentication timed out. Try again.[/red]")
                 raise typer.Exit(1)
 
-    config.api_key = result["api_key"]
-    config.user_email = result["user_email"]
-    config.customer_name = result["customer_name"]
+    # Handle OAuth2 or legacy API key response.
+    if result.get("access_token"):
+        config.access_token = result["access_token"]
+        config.refresh_token = result.get("refresh_token")
+        from datetime import datetime, timedelta, timezone
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=result.get("expires_in", 3600))
+        config.token_expires_at = expires_at.isoformat()
+        config.api_key = None  # Clear legacy key if present
+    else:
+        config.api_key = result["api_key"]
+
+    config.user_email = result.get("user_email", "")
+    config.customer_name = result.get("customer_name", "")
     save_config(config)
 
-    console.print(f"[green]✓[/green] Authenticated as [bold]{result['user_email']}[/bold] ({result['customer_name']})")
-    console.print("[green]✓[/green] Credentials saved to ~/.sciath/config.json")
+    console.print(f"[green]✓[/green] Authenticated as [bold]{result.get('user_email', '')}[/bold] ({result.get('customer_name', '')})")
+    auth_type = "OAuth2 tokens" if result.get("access_token") else "API key"
+    console.print(f"[green]✓[/green] {auth_type} saved to ~/.sciath/config.json")
 
 
 @app.command()
@@ -99,12 +110,16 @@ def logout() -> None:
 def whoami() -> None:
     """Show current authenticated user."""
     config = load_config()
-    if not config.api_key:
+    if not config.has_any_auth:
         console.print("[yellow]Not authenticated.[/yellow] Run [bold]sciath login[/bold] first.")
         raise typer.Exit(1)
 
     console.print(f"Email:    {config.user_email or '(unknown)'}")
     console.print(f"Customer: {config.customer_name or '(unknown)'}")
     console.print(f"API URL:  {config.api_url}")
+    auth_method = "OAuth2" if config.has_oauth2 else "API key (legacy)"
+    console.print(f"Auth:     {auth_method}")
+    if config.token_expires_at:
+        console.print(f"Expires:  {config.token_expires_at}")
     if config.active_project_name:
         console.print(f"Project:  {config.active_project_name}")
