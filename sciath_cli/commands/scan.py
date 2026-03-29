@@ -187,6 +187,38 @@ def run_scan(
     raise typer.Exit(formatter.exit_code)
 
 
+def _resolve_scan_id(api: SciathAPI, scan_id: str) -> str:
+    """Resolve a short scan ID prefix to a full UUID.
+
+    If scan_id already looks like a full UUID (36 chars), return as-is.
+    Otherwise, list recent scans and find one whose ID starts with the prefix.
+    Raises typer.Exit on no match or ambiguous match.
+    """
+    if len(scan_id) >= 36:
+        return scan_id
+
+    try:
+        result = api.list_scans(limit=100)
+    except SciathAPIError:
+        # Can't resolve, let the API try the raw value
+        return scan_id
+
+    matches = [s for s in result.get("items", []) if s["id"].startswith(scan_id)]
+
+    if len(matches) == 1:
+        resolved: str = matches[0]["id"]
+        return resolved
+    elif len(matches) == 0:
+        console.print(f"[red]✗ No scan found matching prefix '{scan_id}'[/red]")
+        raise typer.Exit(1)
+    else:
+        console.print(f"[red]✗ Ambiguous prefix '{scan_id}' matches {len(matches)} scans:[/red]")
+        for m in matches[:5]:
+            console.print(f"  {m['id'][:12]}  {m.get('version_label', '')}")
+        console.print("[dim]Use a longer prefix or the full ID.[/dim]")
+        raise typer.Exit(1)
+
+
 def _run_analyse_with_retry(api: SciathAPI, scan_id: str, progress: Any, task: Any) -> Optional[dict[str, Any]]:
     """
     Dispatch analysis then poll until a terminal status is reached.
@@ -256,6 +288,7 @@ def reanalyse(
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console) as progress:
         task = progress.add_task("  Running analysis...", total=None)
         with SciathAPI(config) as api:
+            scan_id = _resolve_scan_id(api, scan_id)
             result = _run_analyse_with_retry(api, scan_id, progress, task)
 
     if result is None:
@@ -273,6 +306,7 @@ def status(
 ) -> None:
     """Check the status of a scan."""
     with SciathAPI(config) as api:
+        scan_id = _resolve_scan_id(api, scan_id)
         try:
             data = api.get_scan_status(scan_id)
         except SciathAPIError as exc:

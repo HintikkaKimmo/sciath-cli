@@ -49,18 +49,22 @@ def list_projects(config: Any = None) -> None:
 
 @app.command()
 @requires_auth
-def create(name: str = typer.Argument(..., help="Project name"), config: Any = None) -> None:
+def create(
+    name: str = typer.Argument(..., help="Project name"),
+    build_system: str = typer.Option("yocto", "--build-system", "-b", help="Build system (yocto, buildroot, debian, openwrt)"),
+    architecture: str = typer.Option("", "--architecture", "-a", help="Target architecture (arm64, armhf, x86_64)"),
+    config: Any = None,
+) -> None:
     """Create a new project."""
     with SciathAPI(config) as api:
         try:
-            # Projects require a customer_id; derive from user's customer
-            # The API will scope this to the authenticated customer
-            result = api.create_project(customer_id="", name=name)
+            result = api.create_project(name=name, build_system=build_system, architecture=architecture)
         except SciathAPIError as exc:
             console.print(f"[red]✗ {exc}[/red]")
             raise typer.Exit(1)
 
     console.print(f"[green]✓[/green] Created project [bold]{result['name']}[/bold] ({result['id'][:8]})")
+    console.print(f"    Build system: {result.get('build_system', '')}  Architecture: {result.get('architecture', '')}")
 
 
 @app.command()

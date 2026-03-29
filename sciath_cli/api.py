@@ -6,11 +6,14 @@ All requests go through _request() which centralises:
   - typed exception raising (AuthError, NotFoundError, etc.)
   - connection reuse via a persistent httpx.Client
 """
+import logging
 from typing import Any, Optional
 
 import httpx
 
 from sciath_cli.config import SciathConfig, save_config
+
+logger = logging.getLogger(__name__)
 
 # ─── Exceptions ───────────────────────────────────────────────────────────────
 
@@ -89,12 +92,15 @@ class SciathAPI:
           ValidationError on 422 (includes field_errors)
           ServerError     on 5xx (retry-eligible)
         """
+        logger.debug("api.request method=%s path=%s", method, path)
         try:
             response = self._client.request(method, f"/api/{path}", **kwargs)
         except httpx.ConnectError as exc:
             raise ServerError(f"Connection failed: {exc}", status_code=0) from exc
         except httpx.TimeoutException as exc:
             raise ServerError(f"Request timed out: {exc}", status_code=0) from exc
+
+        logger.debug("api.response method=%s path=%s status=%d", method, path, response.status_code)
 
         if response.status_code == 401:
             # Auto-refresh OAuth2 token if we have a refresh token.
@@ -112,6 +118,7 @@ class SciathAPI:
             try:
                 detail = response.json().get("detail", [])
             except Exception:
+                logger.debug("response.parse_error status=422 path=%s", path, exc_info=True)
                 detail = []
             raise ValidationError("Validation error", field_errors=detail)
         if response.status_code >= 500:
@@ -124,6 +131,7 @@ class SciathAPI:
 
     def _try_refresh(self) -> bool:
         """Attempt to refresh the OAuth2 access token. Returns True on success."""
+        logger.debug("token_refresh.attempt")
         try:
             response = self._client.post(
                 "/api/auth/v1/token/refresh",
@@ -149,6 +157,7 @@ class SciathAPI:
 
             return True
         except Exception:
+            logger.debug("token_refresh.failed", exc_info=True)
             return False
 
     # ── Auth ────────────────────────────────────────────────────────────────
@@ -164,11 +173,11 @@ class SciathAPI:
     def list_projects(self, limit: int = 100) -> dict[str, Any]:
         return self._request("GET", "core/v1/projects/", params={"limit": limit})
 
-    def create_project(self, customer_id: str, name: str, **kwargs: Any) -> dict[str, Any]:
-        return self._request(
-            "POST", "core/v1/projects/",
-            json={"customer_id": customer_id, "name": name, **kwargs},
-        )
+    def create_project(self, name: str, **kwargs: Any) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name, **kwargs}
+        # Omit empty values so server auto-fills (e.g. customer_id from auth)
+        payload = {k: v for k, v in payload.items() if v}
+        return self._request("POST", "core/v1/projects/", json=payload)
 
     # ── Scans ───────────────────────────────────────────────────────────────
 
@@ -288,6 +297,7 @@ class SciathAPI:
             try:
                 detail = response.json().get("detail", response.text)
             except Exception:
+                logger.debug("export.parse_error scan_id=%s", scan_id, exc_info=True)
                 detail = response.text
             raise ValidationError(str(detail))
         if response.status_code >= 400:
