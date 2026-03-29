@@ -18,7 +18,7 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from sciath_cli.api import SciathAPI, SciathAPIError, ServerError
+from sciath_cli.api import NotFoundError, SciathAPI, SciathAPIError, ServerError
 from sciath_cli.config import requires_auth
 from sciath_cli.console import console
 from sciath_cli.output import OutputFormatter
@@ -191,23 +191,41 @@ def _resolve_scan_id(api: SciathAPI, scan_id: str) -> str:
     """Resolve a short scan ID prefix to a full UUID.
 
     If scan_id already looks like a full UUID (36 chars), return as-is.
-    Otherwise, list recent scans and find one whose ID starts with the prefix.
-    Raises typer.Exit on no match or ambiguous match.
+    Otherwise, use the server-side resolve endpoint (single DB query, no limit).
+    Falls back to client-side matching for older servers.
     """
     if len(scan_id) >= 36:
         return scan_id
 
+    # Try server-side resolve (works with any number of scans).
+    try:
+        result = api.resolve_scan(scan_id)
+        resolved: str = result["id"]
+        return resolved
+    except NotFoundError:
+        console.print(f"[red]✗ No scan found matching prefix '{scan_id}'[/red]")
+        raise typer.Exit(1)
+    except SciathAPIError as exc:
+        msg = str(exc)
+        if "Ambiguous" in msg or "409" in msg:
+            console.print(f"[red]✗ Ambiguous prefix '{scan_id}' — use more characters[/red]")
+            raise typer.Exit(1)
+        # Fallback to client-side for older servers without the resolve endpoint.
+        return _resolve_scan_id_fallback(api, scan_id)
+
+
+def _resolve_scan_id_fallback(api: SciathAPI, scan_id: str) -> str:
+    """Client-side prefix resolution (for servers without /scans/resolve/)."""
     try:
         result = api.list_scans(limit=100)
     except SciathAPIError:
-        # Can't resolve, let the API try the raw value
         return scan_id
 
     matches = [s for s in result.get("items", []) if s["id"].startswith(scan_id)]
 
     if len(matches) == 1:
-        resolved: str = matches[0]["id"]
-        return resolved
+        fallback_resolved: str = matches[0]["id"]
+        return fallback_resolved
     elif len(matches) == 0:
         console.print(f"[red]✗ No scan found matching prefix '{scan_id}'[/red]")
         raise typer.Exit(1)

@@ -210,6 +210,10 @@ class SciathAPI:
 
     # ── Scans ───────────────────────────────────────────────────────────────
 
+    def resolve_scan(self, prefix: str) -> dict[str, Any]:
+        """Resolve a short scan ID prefix to a full scan via server-side lookup."""
+        return self._request("GET", "core/v1/scans/resolve/", params={"prefix": prefix})
+
     def list_scans(self, project_id: Optional[str] = None, limit: int = 20) -> dict[str, Any]:
         params: dict[str, Any] = {"limit": limit}
         if project_id:
