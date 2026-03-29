@@ -5,6 +5,40 @@ All notable changes to sciath-cli will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **OAuth2 token support.** `sciath login` now supports OAuth2 bearer tokens with
+  automatic refresh. Works alongside existing API key auth.
+- **`--debug` flag.** Global `--debug` flag enables verbose logging across all commands.
+  Silent exception swallows replaced with proper error logging.
+- **SPDX export format.** `sciath report` and `sciath vex` now support `--format spdx`
+  for SPDX 2.3 output.
+- **Policy management commands.** `sciath policy list`, `sciath policy create`,
+  `sciath policy delete` for managing suppression policies. New `--policy` flag on
+  `sciath scan run` to attach a policy to the scan.
+- **`--depgraph` flag.** `sciath scan run --depgraph` uploads bitbake dependency graph
+  dot output alongside the SBOM.
+- **SECURITY.md, CODEOWNERS.** Semgrep scanning and SHA-pinned GitHub Actions.
+- **Sigstore signing.** Release artifacts get Sigstore signatures, SLSA provenance,
+  and CycloneDX SBOM.
+- **CI workflow.** GitHub Actions for linting (ruff), type checking (mypy), and tests.
+  Pre-commit hooks added.
+
+### Changed
+
+- Strict mypy enabled — type annotations added across all modules.
+- Conventional commit enforcement via pre-commit hook and CI.
+
+### Fixed
+
+- `sciath project create` flag parsing corrected.
+- Scan ID prefix resolution now works with short prefixes.
+- Error messages across all commands improved with actionable hints.
+
+[Unreleased]: https://github.com/HintikkaKimmo/sciath-cli/compare/v0.2.0...HEAD
+
 ## [0.2.0] - 2026-03-26
 
 ### Added
