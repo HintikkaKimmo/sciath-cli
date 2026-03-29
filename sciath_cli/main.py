@@ -8,6 +8,9 @@ Command structure:
   sciath assess list/approve/reject
   sciath report [scan-id]
 """
+import logging
+import sys
+
 import typer
 
 from sciath_cli import __version__
@@ -59,12 +62,19 @@ def mcp_server() -> None:
 
 
 @app.callback(invoke_without_command=True)
-def version_flag(
+def main_callback(
     version: bool = typer.Option(False, "--version", "-V", help="Show version and exit", is_eager=True),
+    debug: bool = typer.Option(False, "--debug", help="Enable debug logging to stderr"),
 ) -> None:
     if version:
         typer.echo(f"sciath {__version__}")
         raise typer.Exit()
+
+    logging.basicConfig(
+        level=logging.DEBUG if debug else logging.WARNING,
+        format="%(levelname)s %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
 
 
 def main() -> None:

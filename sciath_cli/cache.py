@@ -9,8 +9,11 @@ Cache stored at ~/.sciath/cache/ with TTL (default 1 hour).
 
 import hashlib
 import json
+import logging
 import time
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 CACHE_DIR = Path.home() / ".sciath" / "cache"
 DEFAULT_TTL = 3600  # 1 hour
@@ -44,16 +47,20 @@ def get_cached_scan(
     cache_file = CACHE_DIR / f"{key}.json"
 
     if not cache_file.exists():
+        logger.debug("cache.miss key=%s", key[:8])
         return None
 
     try:
         data = json.loads(cache_file.read_text())
         if time.time() - data.get("timestamp", 0) > DEFAULT_TTL:
+            logger.debug("cache.expired key=%s", key[:8])
             cache_file.unlink(missing_ok=True)
             return None
         scan_id: str | None = data.get("scan_id")
+        logger.debug("cache.hit key=%s scan_id=%s", key[:8], scan_id)
         return scan_id
     except (json.JSONDecodeError, OSError):
+        logger.debug("cache.corrupt key=%s", key[:8], exc_info=True)
         cache_file.unlink(missing_ok=True)
         return None
 

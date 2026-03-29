@@ -96,6 +96,7 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()  # type: ignore[untyped-decorator]
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+    logger.debug("mcp.tool_call tool=%s", name)
     try:
         if name == "scan_sbom":
             return await _tool_scan_sbom(arguments)
@@ -108,8 +109,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except ValueError as e:
+        logger.error("mcp.tool_error tool=%s error=%s", name, e, exc_info=True)
         return [TextContent(type="text", text=f"Error: {e}")]
     except SciathAPIError as e:
+        logger.error("mcp.tool_error tool=%s error=%s", name, e, exc_info=True)
         return [TextContent(type="text", text=f"API error: {e}")]
 
 

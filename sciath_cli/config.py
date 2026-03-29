@@ -6,6 +6,7 @@ Precedence for api_url (highest → lowest):
   2. api_url in ~/.sciath/config.json
   3. Default: https://api.sciath.io
 """
+import logging
 import os
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
@@ -13,6 +14,8 @@ from typing import Any, Callable, Optional, TypeVar
 import typer
 from pydantic import BaseModel
 from typing_extensions import ParamSpec
+
+logger = logging.getLogger(__name__)
 
 CONFIG_DIR = Path.home() / ".sciath"
 CONFIG_FILE = CONFIG_DIR / "config.json"
@@ -48,12 +51,13 @@ def load_config() -> SciathConfig:
             data = json.loads(CONFIG_FILE.read_text())
             config = SciathConfig(**data)
         except Exception:
-            pass  # corrupted config — start fresh
+            logger.warning("config.corrupt path=%s", CONFIG_FILE, exc_info=True)
 
     env_url = os.environ.get("SCIATH_API_URL")
     if env_url:
         config.api_url = env_url.rstrip("/")
 
+    logger.debug("config.loaded api_url=%s has_auth=%s", config.api_url, config.has_any_auth)
     return config
 
 

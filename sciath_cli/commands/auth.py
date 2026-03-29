@@ -5,6 +5,7 @@ Login uses the device code flow already built in api/routers/auth.py:
   POST /api/auth/v1/device/code  → device_code + poll_code
   GET  /api/auth/v1/device/token → api_key once browser authorises
 """
+import logging
 import time
 
 import httpx
@@ -14,6 +15,8 @@ from rich.spinner import Spinner
 
 from sciath_cli.config import clear_config, load_config, save_config
 from sciath_cli.console import console
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(help="Authentication commands.")
 
@@ -64,6 +67,7 @@ def login(
                     resp = client.get("/api/auth/v1/device/token", params={"poll_code": poll_code})
                     result = resp.json()
                 except Exception:
+                    logger.debug("auth.poll_error", exc_info=True)
                     continue  # transient network error — keep polling
 
                 if result.get("access_token") or result.get("api_key"):

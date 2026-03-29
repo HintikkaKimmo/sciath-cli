@@ -122,6 +122,35 @@ All HTTP requests go through `SciathAPI._request()` which centralises:
 
 Commands should never call `httpx` directly — always go through `SciathAPI`.
 
+## Logging
+
+### Architecture
+
+- Logging goes to **stderr** (stdout is reserved for command output like JSON)
+- Default level: `WARNING` (silent unless something goes wrong)
+- `--debug` global flag sets level to `DEBUG` (verbose diagnostics)
+- Format: `%(levelname)s %(name)s: %(message)s` (no timestamps)
+
+### Rules
+
+- Always `logging.getLogger(__name__)`. No string literals.
+- **NEVER log:** API keys, OAuth2 tokens, config file contents, SBOM data,
+  request/response bodies
+- Every `except` block must either re-raise OR log before continuing.
+  **No silent exception swallows.** Use `logger.debug(..., exc_info=True)` at minimum.
+- `DEBUG`: API requests (method + path + status), token refresh attempts,
+  cache hits/misses, config load, auto-detection of files
+- `WARNING`: corrupted config files, malformed API response parsing
+- `ERROR`: rare — most errors surface to the user via `console.print("[red]...")`
+
+### Testing logging
+
+```bash
+# Verify --debug shows API traffic on stderr, stdout stays clean
+sciath --debug scan list 2>debug.log
+sciath scan list --format json | jq .   # stdout must be valid JSON
+```
+
 ## Relationship to the server
 
 - CLI talks to the server API at the URL stored in `~/.sciath/config.json`
