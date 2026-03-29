@@ -1,0 +1,5 @@
+# Security-critical paths require owner review
+.github/            @HintikkaKimmo
+sciath_cli/config.py @HintikkaKimmo
+sciath_cli/api.py   @HintikkaKimmo
+install.sh          @HintikkaKimmo
