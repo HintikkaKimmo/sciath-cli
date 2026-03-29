@@ -39,10 +39,10 @@ def vex(
         try:
             content = api.export_cdx(scan_id, fmt=fmt, validate=validate)
         except NotFoundError:
-            console.print("[red]✗ Scan not found.[/red]")
+            console.print(f"[red]✗ Scan '{scan_id}' not found.[/red] Check the ID with [bold]sciath scan list[/bold]")
             raise typer.Exit(1)
         except ValidationError as exc:
-            console.print(f"[red]✗ Validation error: {exc}[/red]")
+            console.print(f"[red]✗ {exc}[/red]")
             raise typer.Exit(1)
         except SciathAPIError as exc:
             console.print(f"[red]✗ {exc}[/red]")

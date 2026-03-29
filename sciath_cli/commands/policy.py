@@ -347,7 +347,7 @@ def _find_policy(config: Any, name_or_id: str) -> Optional[dict[str, Any]]:
         None,
     )
     if not match:
-        console.print(f"[red]✗ Policy not found: {name_or_id}[/red]")
+        console.print(f"[red]✗ Policy not found: '{name_or_id}'[/red] — check available policies with [bold]sciath policy list[/bold]")
         return None
 
     found: dict[str, Any] = match

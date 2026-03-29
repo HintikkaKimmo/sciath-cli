@@ -398,7 +398,7 @@ def _auto_detect_sbom() -> Optional[Path]:
                 console.print(f"  [yellow]⚠ Found {len(matches)} SBOMs — using first. Specify path to override.[/yellow]")
             return found
 
-    console.print("[red]✗ No SBOM file found.[/red] Checked:")
+    console.print("[red]✗ No SBOM file found in current directory.[/red] Checked:")
     for name in _SBOM_CANDIDATES:
         console.print(f"  [dim]{name}[/dim]")
     for pattern in _SBOM_GLOBS:

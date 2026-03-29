@@ -84,7 +84,7 @@ def select(name: str = typer.Argument(..., help="Project name or ID"), config: A
         None,
     )
     if not match:
-        console.print(f"[red]✗ Project not found: {name}[/red]")
+        console.print(f"[red]✗ Project not found: '{name}'[/red] — check available projects with [bold]sciath project list[/bold]")
         raise typer.Exit(1)
 
     config.active_project_id = match["id"]

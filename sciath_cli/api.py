@@ -96,9 +96,17 @@ class SciathAPI:
         try:
             response = self._client.request(method, f"/api/{path}", **kwargs)
         except httpx.ConnectError as exc:
-            raise ServerError(f"Connection failed: {exc}", status_code=0) from exc
+            raise ServerError(
+                f"Cannot reach {self._config.api_url} — check your network connection "
+                f"or verify the API URL with 'sciath whoami'",
+                status_code=0,
+            ) from exc
         except httpx.TimeoutException as exc:
-            raise ServerError(f"Request timed out: {exc}", status_code=0) from exc
+            raise ServerError(
+                f"Request timed out after 90s ({method} {path}) — the server may be "
+                f"overloaded, or try again later",
+                status_code=0,
+            ) from exc
 
         logger.debug("api.response method=%s path=%s status=%d", method, path, response.status_code)
 
@@ -109,21 +117,42 @@ class SciathAPI:
                 if refreshed:
                     # Retry the original request with the new token.
                     return self._request(method, path, _no_refresh=True, **kwargs)
-            raise AuthError("Not authenticated — run [bold]sciath login[/bold]")
+            raise AuthError(
+                "Session expired or invalid — run [bold]sciath login[/bold] to re-authenticate"
+            )
         if response.status_code == 403:
-            raise ScopeError("Permission denied (missing API key scope)")
+            raise ScopeError(
+                "Permission denied — your API key or token lacks the required scope. "
+                "Check with [bold]sciath whoami[/bold] or contact your admin"
+            )
         if response.status_code == 404:
-            raise NotFoundError("Resource not found")
+            raise NotFoundError(
+                f"Resource not found ({method} {path}) — check the ID is correct"
+            )
         if response.status_code == 422:
             try:
                 detail = response.json().get("detail", [])
             except Exception:
                 logger.debug("response.parse_error status=422 path=%s", path, exc_info=True)
                 detail = []
-            raise ValidationError("Validation error", field_errors=detail)
+            # Build a human-readable validation message
+            if isinstance(detail, list) and detail:
+                field_msgs = []
+                for err in detail[:3]:
+                    if isinstance(err, dict):
+                        loc = " → ".join(str(part) for part in err.get("loc", []))
+                        msg = err.get("msg", "invalid")
+                        field_msgs.append(f"  {loc}: {msg}" if loc else f"  {msg}")
+                    else:
+                        field_msgs.append(f"  {err}")
+                hint = "\n".join(field_msgs)
+                raise ValidationError(f"Validation error:\n{hint}", field_errors=detail)
+            raise ValidationError("Validation error — check your input", field_errors=detail)
         if response.status_code >= 500:
             raise ServerError(
-                f"Server error ({response.status_code})", status_code=response.status_code
+                f"Server error ({response.status_code}) — this is a problem on the Sciath "
+                f"side, not your input. Try again in a few minutes",
+                status_code=response.status_code,
             )
 
         result: dict[str, Any] = response.json()
@@ -360,9 +389,19 @@ class SciathAPI:
         try:
             response = _httpx.get(url, follow_redirects=True, timeout=120.0)
         except _httpx.TimeoutException as exc:
-            raise ServerError(f"Download timed out: {exc}", status_code=0) from exc
+            raise ServerError(
+                "Report download timed out — the file may be large, try again",
+                status_code=0,
+            ) from exc
         except _httpx.ConnectError as exc:
-            raise ServerError(f"Download connection failed: {exc}", status_code=0) from exc
+            raise ServerError(
+                "Cannot reach download server — check your network connection",
+                status_code=0,
+            ) from exc
         if response.status_code >= 400:
-            raise ServerError(f"Download failed ({response.status_code})", status_code=response.status_code)
+            raise ServerError(
+                f"Download failed (HTTP {response.status_code}) — the download link may "
+                f"have expired, regenerate the report",
+                status_code=response.status_code,
+            )
         return response.content

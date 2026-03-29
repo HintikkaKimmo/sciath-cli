@@ -43,7 +43,7 @@ def report(
             try:
                 report_meta = api.generate_report(scan_id, api_format)
             except NotFoundError:
-                console.print("[red]✗ Scan not found.[/red]")
+                console.print(f"[red]✗ Scan '{scan_id}' not found.[/red] Check the ID with [bold]sciath scan list[/bold]")
                 raise typer.Exit(1)
             except SciathAPIError as exc:
                 console.print(f"[red]✗ {exc}[/red]")
