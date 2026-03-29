@@ -7,6 +7,7 @@ import typer
 from rich.table import Table
 
 from sciath_cli.api import SciathAPI, SciathAPIError
+from sciath_cli.commands.scan import _resolve_scan_id
 from sciath_cli.config import requires_auth
 from sciath_cli.console import console
 
@@ -17,16 +18,19 @@ app = typer.Typer(help="Review vulnerability assessments.")
 @requires_auth
 def list_assessments(
     scan_id: Optional[str] = typer.Argument(None, help="Scan ID or prefix to filter by"),
-    pending_only: bool = typer.Option(True, "--pending/--all", help="Show only assessments needing review"),
+    pending_only: bool = typer.Option(False, "--pending/--all", help="Show only pending assessments (under_investigation)"),
     filter_layer: Optional[str] = typer.Option(None, "--filter-layer", help="Filter by layer (kconfig/dtb/busybox/packageconfig/patch/custom/build_time/deployment)"),
+    output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
     config: Any = None,
 ) -> None:
     """List vulnerability assessments for a scan."""
     with SciathAPI(config) as api:
+        if scan_id:
+            scan_id = _resolve_scan_id(api, scan_id)
         try:
             result = api.list_assessments(
                 scan_id=scan_id,
-                status="auto_pending" if pending_only else None,
+                status="under_investigation" if pending_only else None,
                 filter_layer=filter_layer,
             )
         except SciathAPIError as exc:
@@ -36,6 +40,13 @@ def list_assessments(
     items = result.get("items", [])
     if not items:
         console.print("[dim]No assessments found.[/dim]")
+        return
+
+    if output_format == "json":
+        import json
+
+        from rich.console import Console
+        Console().print(json.dumps(result, indent=2, default=str))
         return
 
     table = Table(show_header=True, header_style="bold")
