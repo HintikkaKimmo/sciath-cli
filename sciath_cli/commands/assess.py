@@ -21,6 +21,7 @@ def list_assessments(
     pending_only: bool = typer.Option(False, "--pending/--all", help="Show only pending assessments (under_investigation)"),
     filter_layer: Optional[str] = typer.Option(None, "--filter-layer", help="Filter by layer (kconfig/dtb/busybox/packageconfig/patch/custom/build_time/deployment)"),
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json"),
+    limit: int = typer.Option(500, "--limit", "-l", help="Max results to return"),
     config: Any = None,
 ) -> None:
     """List vulnerability assessments for a scan."""
@@ -32,6 +33,7 @@ def list_assessments(
                 scan_id=scan_id,
                 status="under_investigation" if pending_only else None,
                 filter_layer=filter_layer,
+                limit=limit,
             )
         except SciathAPIError as exc:
             console.print(f"[red]✗ {exc}[/red]")

@@ -133,7 +133,7 @@ def run_scan(
                         assessments = None
                         if explain or output_format == "json" or severity_threshold or fail_on_kev:
                             try:
-                                resp = api.list_assessments(scan_id=cached_scan_id, limit=500)
+                                resp = api.list_assessments(scan_id=cached_scan_id, limit=2000)
                                 assessments = resp.get("items", [])
                             except SciathAPIError:
                                 pass
@@ -172,7 +172,7 @@ def run_scan(
             assessments = None
             if result and (explain or output_format == "json" or severity_threshold or fail_on_kev):
                 try:
-                    resp = api.list_assessments(scan_id=scan_id, limit=500)
+                    resp = api.list_assessments(scan_id=scan_id, limit=2000)
                     assessments = resp.get("items", [])
                 except SciathAPIError:
                     pass  # Non-fatal — render without assessments
@@ -339,6 +339,7 @@ def status(
 @requires_auth
 def list_scans(
     project_id: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project"),
+    limit: int = typer.Option(100, "--limit", "-l", help="Max results to return"),
     config: Any = None,
 ) -> None:
     """List recent scans."""
@@ -346,7 +347,7 @@ def list_scans(
 
     with SciathAPI(config) as api:
         try:
-            result = api.list_scans(project_id=proj_id)
+            result = api.list_scans(project_id=proj_id, limit=limit)
         except SciathAPIError as exc:
             console.print(f"[red]✗ {exc}[/red]")
             raise typer.Exit(1)
