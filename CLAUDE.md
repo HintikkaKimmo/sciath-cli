@@ -151,6 +151,17 @@ sciath --debug scan list 2>debug.log
 sciath scan list --format json | jq .   # stdout must be valid JSON
 ```
 
+## CHANGELOG and VERSION — update on every commit
+
+**Every commit that changes functionality must update `CHANGELOG.md`.**
+
+- Add a bullet under `## [Unreleased]` in the appropriate section (`Added`, `Changed`, `Fixed`).
+- Use the same voice as existing entries: bold lead phrase, then one-sentence description.
+- `VERSION` (in `sciath_cli/__init__.py`) is only bumped when cutting a release, not on every commit.
+
+**Exceptions:** Pure docs changes, CI config tweaks, and dependency-only updates
+do not need a CHANGELOG entry.
+
 ## Relationship to the server
 
 - CLI talks to the server API at the URL stored in `~/.sciath/config.json`
