@@ -36,6 +36,8 @@ def vex(
         raise typer.Exit(1)
 
     with SciathAPI(config) as api:
+        from sciath_cli.commands.scan import _resolve_scan_id
+        scan_id = _resolve_scan_id(api, scan_id)
         try:
             content = api.export_cdx(scan_id, fmt=fmt, validate=validate)
         except NotFoundError:
