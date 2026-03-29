@@ -13,6 +13,23 @@ on:
     branches: [main, master]
 
 jobs:
+  commit-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Validate conventional commits
+        run: |
+          PATTERN='^(feat|fix|chore|docs|refactor|test|ci|perf|style|build|revert)(\(.+\))?: .+'
+          git log --format='%s' origin/HEAD..HEAD 2>/dev/null | while read -r msg; do
+            if ! echo "$msg" | grep -qE "$PATTERN"; then
+              echo "::error::Invalid commit message: $msg"
+              echo "Expected format: type(scope): description"
+              exit 1
+            fi
+          done
+
   lint-and-test:
     runs-on: ubuntu-latest
     strategy:
