@@ -6,7 +6,7 @@ Command structure:
   sciath project list/create/select/info
   sciath scan run/status/list/reanalyse
   sciath assess list/approve/reject
-  sciath report [scan-id]
+  sciath report <scan-id> [--format pdf|vex|csaf|spdx]
 """
 import logging
 import sys

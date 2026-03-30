@@ -21,18 +21,20 @@ DEFAULT_TTL = 3600  # 1 hour
 
 def _cache_key(
     project_id: str,
+    version_label: str,
     sbom_raw: str,
     kconfig_raw: str,
     dtb_raw: str,
     custom_filter_raw: str = "",
 ) -> str:
-    """Compute a cache key from input content."""
-    content = f"{project_id}:{sbom_raw}:{kconfig_raw}:{dtb_raw}:{custom_filter_raw}"
+    """Compute a cache key from input content (including version label)."""
+    content = f"{project_id}:{version_label}:{sbom_raw}:{kconfig_raw}:{dtb_raw}:{custom_filter_raw}"
     return hashlib.sha256(content.encode()).hexdigest()[:32]
 
 
 def get_cached_scan(
     project_id: str,
+    version_label: str,
     sbom_raw: str,
     kconfig_raw: str = "",
     dtb_raw: str = "",
@@ -43,7 +45,7 @@ def get_cached_scan(
 
     Returns scan_id if cache hit, None if miss or expired.
     """
-    key = _cache_key(project_id, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
+    key = _cache_key(project_id, version_label, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
     cache_file = CACHE_DIR / f"{key}.json"
 
     if not cache_file.exists():
@@ -67,6 +69,7 @@ def get_cached_scan(
 
 def save_cache(
     project_id: str,
+    version_label: str,
     sbom_raw: str,
     kconfig_raw: str,
     dtb_raw: str,
@@ -75,7 +78,7 @@ def save_cache(
 ) -> None:
     """Save a scan result to the local cache. Also cleans up expired entries."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    key = _cache_key(project_id, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
+    key = _cache_key(project_id, version_label, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
     cache_file = CACHE_DIR / f"{key}.json"
 
     data = {

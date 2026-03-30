@@ -47,6 +47,19 @@ class ServerError(SciathAPIError):
         self.status_code = status_code
 
 
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+
+def _filename_from_headers(response: httpx.Response) -> str:
+    """Extract filename from Content-Disposition header, or return a default."""
+    cd = response.headers.get("content-disposition", "")
+    if 'filename="' in cd:
+        parts = cd.split('filename="')
+        name: str = parts[1].rstrip('"')
+        return name
+    return "report"
+
+
 # ─── Client ───────────────────────────────────────────────────────────────────
 
 class SciathAPI:
@@ -308,12 +321,53 @@ class SciathAPI:
         """GET /reports/v1/{report_id}/ → report metadata + status."""
         return self._request("GET", f"reports/v1/{report_id}/")
 
-    def get_report_download_url(self, report_id: str) -> dict[str, Any]:
+    def download_report(self, report_id: str) -> tuple[bytes, str]:
         """
-        GET /reports/v1/{report_id}/download/ → {"url": "...", "expires_in": 900}
-        Returns the JSON metadata dict; caller fetches the URL separately.
+        GET /reports/v1/{report_id}/download/ → (content_bytes, filename).
+
+        Two server modes:
+        - S3 prod: JSON {"url": "<presigned>", "filename": "..."} → fetch from S3
+        - Local dev: raw bytes with Content-Disposition header
         """
-        return self._request("GET", f"reports/v1/{report_id}/download/")
+        response = self._client.request(
+            "GET", f"/api/reports/v1/{report_id}/download/",
+            timeout=120.0,
+        )
+        if response.status_code == 404:
+            raise NotFoundError("Report not found")
+        if response.status_code == 202:
+            raise SciathAPIError("Report is still generating")
+        if response.status_code == 409:
+            raise SciathAPIError("Report generation failed")
+        if response.status_code >= 400:
+            raise ServerError(
+                f"Download failed ({response.status_code})",
+                status_code=response.status_code,
+            )
+
+        content_type = response.headers.get("content-type", "")
+
+        # S3 mode: server returns JSON with presigned URL
+        if "application/json" in content_type:
+            try:
+                meta = response.json()
+            except Exception:
+                # JSON format report returned inline (VEX, CSAF)
+                if not response.content:
+                    raise SciathAPIError("Server returned empty file")
+                return response.content, _filename_from_headers(response)
+            if "url" in meta:
+                content = self._download_from_url(meta["url"])
+                return content, meta.get("filename", "report")
+            # JSON report content returned inline
+            if not response.content:
+                raise SciathAPIError("Server returned empty file")
+            return response.content, _filename_from_headers(response)
+
+        # Disk mode: raw bytes streamed directly
+        if not response.content:
+            raise SciathAPIError("Server returned empty file")
+        return response.content, _filename_from_headers(response)
 
     def export_cdx(self, scan_id: str, fmt: str = "vex_cdx", validate: bool = False) -> bytes:
         """
@@ -384,9 +438,9 @@ class SciathAPI:
 
     # ── Downloads ─────────────────────────────────────────────────────────
 
-    def _download(self, url: str) -> bytes:
+    def _download_from_url(self, url: str) -> bytes:
         """
-        Fetch bytes from a presigned URL (Scaleway S3 or local).
+        Fetch bytes from a presigned S3 URL.
         Uses a fresh httpx client — does NOT send X-API-Key to S3.
         """
         import httpx as _httpx
@@ -408,4 +462,6 @@ class SciathAPI:
                 f"have expired, regenerate the report",
                 status_code=response.status_code,
             )
+        if not response.content:
+            raise SciathAPIError("Server returned empty file")
         return response.content

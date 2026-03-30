@@ -1,4 +1,4 @@
-"""Report command — download compliance reports from the Sciath API."""
+"""Report command — generate and download compliance reports from the Sciath API."""
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -10,7 +10,10 @@ from sciath_cli.api import NotFoundError, SciathAPI, SciathAPIError
 from sciath_cli.config import requires_auth
 from sciath_cli.console import console
 
-app = typer.Typer(help="Generate and download compliance reports.")
+app = typer.Typer(
+    help="Generate and download compliance reports.",
+    invoke_without_command=True,
+)
 
 _FORMAT_MAP = {
     "pdf":  "article13",
@@ -22,24 +25,36 @@ _POLL_INTERVAL = 3   # seconds between status polls
 _POLL_MAX      = 60  # max polls (3 min ceiling)
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 @requires_auth
 def report(
-    scan_id: str = typer.Argument(..., help="Scan ID to generate a report for"),
+    ctx: typer.Context,
+    scan_id: Optional[str] = typer.Argument(None, help="Scan ID (full or short prefix)"),
     fmt: str = typer.Option("pdf", "--format", "-f", help="Output format: pdf, vex, csaf, spdx"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
     config: Any = None,
 ) -> None:
     """Generate and download a compliance report (Article 13 PDF, CycloneDX VEX, CSAF)."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if scan_id is None:
+        console.print("Usage: sciath report <scan-id> [--format pdf|vex|csaf|spdx]")
+        raise typer.Exit(1)
+
     api_format = _FORMAT_MAP.get(fmt)
     if not api_format:
         console.print(f"[red]✗ Unknown format '{fmt}'. Choose: pdf, vex, csaf, spdx[/red]")
         raise typer.Exit(1)
 
     with SciathAPI(config) as api:
-        # 1. Request generation
+        # Resolve short prefix to full UUID
+        from sciath_cli.commands.scan import _resolve_scan_id
+        scan_id = _resolve_scan_id(api, scan_id)
+
         with Progress(SpinnerColumn(), TextColumn("{task.description}"), transient=True) as p:
             task = p.add_task("Requesting report generation…")
+
+            # 1. Request generation
             try:
                 report_meta = api.generate_report(scan_id, api_format)
             except NotFoundError:
@@ -62,24 +77,20 @@ def report(
                     raise typer.Exit(1)
                 time.sleep(_POLL_INTERVAL)
             else:
-                console.print("[red]✗ Report timed out. Check status with: sciath report --check <report_id>[/red]")
+                console.print("[red]✗ Report timed out. Try again or check server logs.[/red]")
                 raise typer.Exit(1)
 
-            # 3. Get presigned download URL
-            p.update(task, description="Fetching download URL…")
+            # 3. Download
+            p.update(task, description="Downloading…")
             try:
-                dl_meta = api.get_report_download_url(report_id)
+                content, server_filename = api.download_report(report_id)
             except SciathAPIError as exc:
                 console.print(f"[red]✗ {exc}[/red]")
                 raise typer.Exit(1)
 
-            # 4. Download bytes
-            p.update(task, description="Downloading…")
-            content = api._download(dl_meta["url"])
-
-        # 5. Write to file
+        # 4. Write to file
         ext = "pdf" if fmt == "pdf" else "json"
-        out_path = Path(output) if output else Path(f"sciath_{scan_id[:8]}_{fmt}.{ext}")
+        out_path = Path(output) if output else Path(server_filename if server_filename != "report" else f"sciath_{scan_id[:8]}_{fmt}.{ext}")
         try:
             out_path.write_bytes(content)
         except IOError as exc:

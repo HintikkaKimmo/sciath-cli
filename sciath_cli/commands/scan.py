@@ -104,7 +104,7 @@ def run_scan(
 
     cached_scan_id = None
     if not no_cache:
-        cached_scan_id = _cache.get_cached_scan(proj_id, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
+        cached_scan_id = _cache.get_cached_scan(proj_id, version, sbom_raw, kconfig_raw, dtb_raw, custom_filter_raw)
 
     # Idempotency key: hash of project + version + sbom content
     idem_key = hashlib.sha256(f"{proj_id}:{version}:{sbom_raw}".encode()).hexdigest()[:32]
@@ -181,7 +181,7 @@ def run_scan(
         raise typer.Exit(1)
 
     # Save to local cache for future runs with same inputs
-    _cache.save_cache(proj_id, sbom_raw, kconfig_raw, dtb_raw, str(result.get("id", "")), custom_filter_raw)
+    _cache.save_cache(proj_id, version, sbom_raw, kconfig_raw, dtb_raw, str(result.get("id", "")), custom_filter_raw)
 
     formatter.render_scan(result, assessments=assessments)
     raise typer.Exit(formatter.exit_code)
