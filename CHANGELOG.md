@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Deduplicated scan display** — consolidated `_quality_grade()` and scan summary rendering into `OutputFormatter` (single source of truth)
+- **HTTP 429 handling** — API client now raises `RateLimitError` with retry-after information
+- **Expanded test coverage** — added `test_output_formatter.py` (quality grade boundaries, JSON/quiet format, exit code logic) and `test_api_client.py` 429 tests
+- **Updated CLAUDE.md** — documented consolidated `OutputFormatter` as single display path, added `RateLimitError` to exception list, added `policy.py` to project structure
+- **Updated README.md** — added missing policy command reference (6 commands), added `--policy` scan flag
 - Strict mypy enabled — type annotations added across all modules.
 - Conventional commit enforcement via pre-commit hook and CI.
 

@@ -40,6 +40,16 @@ class ValidationError(SciathAPIError):
         self.field_errors = field_errors or []
 
 
+class RateLimitError(SciathAPIError):
+    """429 Too Many Requests — rate limit exceeded."""
+    def __init__(self, retry_after: int | None = None):
+        self.retry_after = retry_after
+        msg = "Rate limit exceeded."
+        if retry_after:
+            msg += f" Retry after {retry_after} seconds."
+        super().__init__(msg)
+
+
 class ServerError(SciathAPIError):
     """5xx — server-side error, eligible for retry."""
     def __init__(self, message: str, status_code: int):
@@ -161,6 +171,9 @@ class SciathAPI:
                 hint = "\n".join(field_msgs)
                 raise ValidationError(f"Validation error:\n{hint}", field_errors=detail)
             raise ValidationError("Validation error — check your input", field_errors=detail)
+        if response.status_code == 429:
+            retry_after = response.headers.get("Retry-After")
+            raise RateLimitError(int(retry_after) if retry_after else None)
         if response.status_code >= 500:
             raise ServerError(
                 f"Server error ({response.status_code}) — this is a problem on the Sciath "

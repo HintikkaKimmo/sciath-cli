@@ -332,7 +332,7 @@ def status(
             console.print(f"[red]✗ {exc}[/red]")
             raise typer.Exit(1)
 
-    _display_scan_summary(data)
+    OutputFormatter(format="table").render_scan(data)
 
 
 @app.command("list")
@@ -453,19 +453,6 @@ def _auto_detect_file_glob(patterns: list[str]) -> Optional[Path]:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _quality_grade(score: float) -> str:
-    """Convert a 0.0-1.0 quality score to a letter grade."""
-    if score >= 0.9:
-        return "A"
-    if score >= 0.8:
-        return "B"
-    if score >= 0.7:
-        return "C"
-    if score >= 0.6:
-        return "D"
-    return "F"
-
-
 def _detect_format(path: Path, raw: str) -> str:
     """Heuristic SBOM format detection from filename + content."""
     name = path.name.lower()
@@ -474,38 +461,3 @@ def _detect_format(path: Path, raw: str) -> str:
     if "yocto" in name or name.endswith(".manifest"):
         return "yocto_manifest"
     return "cyclonedx"
-
-
-def _display_scan_summary(data: dict[str, Any]) -> None:
-    total = data.get("total_vulnerabilities", 0)
-    suppressed = data.get("suppressed_count", 0)
-    remaining = data.get("remaining_count", total - suppressed)
-    pct = round(suppressed / total * 100) if total > 0 else 0
-
-    table = Table(title="SCAN SUMMARY", box=None, show_header=False, padding=(0, 2))
-    table.add_column("Label", style="dim")
-    table.add_column("Value", style="bold")
-
-    table.add_row("Components:", str(data.get("total_components", 0)))
-    table.add_row("CVEs Matched:", str(total))
-    table.add_row("Suppressed:", f"{suppressed}  ({pct}%)")
-    table.add_row("Remaining:", str(remaining))
-    table.add_row("Status:", data.get("status", "").upper())
-    table.add_row("Version:", data.get("version_label", ""))
-    table.add_row("Scan ID:", str(data.get("id", ""))[:8])
-
-    quality = data.get("sbom_quality_score")
-    if quality is not None:
-        grade = _quality_grade(quality)
-        table.add_row("SBOM Quality:", f"{quality:.0%} ({grade})")
-
-    console.print()
-    console.print(table)
-    console.print()
-
-    if remaining > 0:
-        scan_short = str(data.get("id", ""))[:8]
-        console.print("  Next steps:")
-        console.print(f"    [dim]sciath assess list {scan_short}[/dim]   # Review CVEs")
-        console.print(f"    [dim]sciath report {scan_short}[/dim]        # Generate Article 13 report")
-    console.print()

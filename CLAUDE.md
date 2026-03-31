@@ -29,7 +29,7 @@ sciath-cli/
 │   ├── config.py            # Config file management (~/.sciath/)
 │   ├── cache.py             # Input caching (skip unchanged uploads)
 │   ├── console.py           # Rich console helpers
-│   ├── output.py            # OutputFormatter (human/JSON modes)
+│   ├── output.py            # OutputFormatter (human/JSON modes), _quality_grade()
 │   ├── mcp_server.py        # MCP server for editor integration
 │   └── commands/
 │       ├── auth.py           # sciath login / logout
@@ -37,6 +37,7 @@ sciath-cli/
 │       ├── assess.py         # sciath assess list / update
 │       ├── report.py         # sciath report generate / download
 │       ├── project.py        # sciath project list / create
+│       ├── policy.py         # sciath policy list / create / import-vex
 │       └── vex.py            # sciath vex (direct CycloneDX export)
 ├── tests/
 ├── pyproject.toml
@@ -117,10 +118,22 @@ We use [Semantic Versioning](https://semver.org/):
 
 All HTTP requests go through `SciathAPI._request()` which centralises:
 - Auth header injection (`X-API-Key`)
-- Typed exception hierarchy (`AuthError`, `ScopeError`, `NotFoundError`, `ValidationError`, `ServerError`)
+- Typed exception hierarchy (`AuthError`, `ScopeError`, `NotFoundError`, `ValidationError`, `ServerError`, `RateLimitError`)
+- Rate limit handling (HTTP 429 with `Retry-After` header support)
 - Connection reuse via persistent `httpx.Client`
 
 Commands should never call `httpx` directly — always go through `SciathAPI`.
+
+## Output formatting
+
+All scan display logic is consolidated in `OutputFormatter` (`output.py`):
+- `_quality_grade()` — SBOM quality score to letter grade (A-F)
+- `render_scan()` — dispatches to table, JSON, or quiet format
+- `_render_table()` — Rich table with scan summary + optional explain mode
+- Exit code logic — severity threshold, KEV gating
+
+**There is exactly one code path for scan summary display.** Do not create
+alternative display functions in command modules — use `OutputFormatter`.
 
 ## Logging
 

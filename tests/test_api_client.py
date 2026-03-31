@@ -9,6 +9,7 @@ import pytest
 from sciath_cli.api import (
     AuthError,
     NotFoundError,
+    RateLimitError,
     SciathAPI,
     ScopeError,
     ServerError,
@@ -17,7 +18,11 @@ from sciath_cli.api import (
 from sciath_cli.config import SciathConfig
 
 
-def _api_with_response(status_code: int, body: dict | str = "") -> SciathAPI:
+def _api_with_response(
+    status_code: int,
+    body: dict | str = "",
+    response_headers: dict[str, str] | None = None,
+) -> SciathAPI:
     """Build a SciathAPI instance backed by a mock transport."""
     if isinstance(body, dict):
         import json
@@ -26,6 +31,9 @@ def _api_with_response(status_code: int, body: dict | str = "") -> SciathAPI:
     else:
         content = body.encode() if isinstance(body, str) else body
         headers = {}
+
+    if response_headers:
+        headers.update(response_headers)
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(status_code, content=content, headers=headers)
@@ -77,6 +85,26 @@ class TestRequestErrorHandling:
         api = _api_with_response(503, "Service unavailable")
         with pytest.raises(ServerError):
             api._request("GET", "scans/v1/abc/status/")
+
+    def test_429_raises_rate_limit_error(self):
+        """429 raises RateLimitError with retry-after header."""
+        api = _api_with_response(
+            429,
+            {"detail": "Rate limit exceeded"},
+            response_headers={"Retry-After": "30"},
+        )
+        with pytest.raises(RateLimitError) as exc_info:
+            api._request("POST", "scans/v1/abc/analyse/")
+        assert exc_info.value.retry_after == 30
+        assert "30 seconds" in str(exc_info.value)
+
+    def test_429_raises_rate_limit_error_without_retry_after(self):
+        """429 without Retry-After header still raises RateLimitError."""
+        api = _api_with_response(429, {"detail": "Rate limit exceeded"})
+        with pytest.raises(RateLimitError) as exc_info:
+            api._request("POST", "scans/v1/abc/analyse/")
+        assert exc_info.value.retry_after is None
+        assert "Rate limit exceeded" in str(exc_info.value)
 
     def test_connection_error_raises_server_error(self):
         def failing_handler(request):

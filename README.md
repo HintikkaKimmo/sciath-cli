@@ -142,6 +142,7 @@ sciath vex <scan-id> --format vex_csaf --output csaf.json
 | `--explain, -e` | Show filter reasoning per CVE |
 | `--severity-threshold <level>` | Exit 1 if findings >= level (`critical`/`high`/`medium`/`low`) |
 | `--fail-on-kev` | Exit 1 if any open CISA KEV finding |
+| `--policy <name>` | Apply a named filter policy to the scan |
 | `--no-cache` | Skip local cache, force fresh upload |
 
 ### Assessments
@@ -151,6 +152,17 @@ sciath vex <scan-id> --format vex_csaf --output csaf.json
 | `sciath assess list <scan-id>` | List vulnerability assessments |
 | `sciath assess approve <id>` | Approve an assessment |
 | `sciath assess reject <id>` | Reject / dispute an assessment |
+
+### Policies
+
+| Command | Description |
+|---------|-------------|
+| `sciath policy list` | List filter policies |
+| `sciath policy show <id>` | Show policy details and rules |
+| `sciath policy create <name>` | Create a new filter policy |
+| `sciath policy delete <id>` | Delete a policy |
+| `sciath policy history <id>` | View policy change history |
+| `sciath policy import-vex <file>` | Import rules from a VEX document |
 
 ### Reports & Export
 
