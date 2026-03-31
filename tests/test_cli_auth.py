@@ -4,7 +4,6 @@ Integration tests for auth commands via CliRunner + mock HTTP.
 import json
 
 import httpx
-import pytest
 from typer.testing import CliRunner
 
 from sciath_cli.config import SciathConfig, load_config, save_config
@@ -12,14 +11,6 @@ from sciath_cli.main import app
 
 runner = CliRunner()
 
-
-@pytest.fixture(autouse=True)
-def isolated_config(tmp_path, monkeypatch):
-    import sciath_cli.config as cfg_module
-    monkeypatch.setattr(cfg_module, "CONFIG_DIR", tmp_path / ".sciath")
-    monkeypatch.setattr(cfg_module, "CONFIG_FILE", tmp_path / ".sciath" / "config.json")
-    monkeypatch.delenv("SCIATH_API_URL", raising=False)
-    yield
 
 
 def _mock_login_sequence(responses: list[dict]):
