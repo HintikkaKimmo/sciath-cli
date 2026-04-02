@@ -116,9 +116,10 @@ class OutputFormatter:
         table.add_column("Value", style="bold")
 
         table.add_row("Components:", str(data.get("total_components", 0)))
-        table.add_row("CVEs Matched:", str(total))
-        table.add_row("Suppressed:", f"{suppressed}  ({pct}%)")
-        table.add_row("Remaining:", str(remaining))
+        table.add_row("CVEs Matched:", f"[bold]{total}[/bold]")
+        table.add_row("Suppressed:", f"[green]{suppressed}[/green]  ({pct}%)")
+        remaining_style = "bold red" if remaining > 0 else "bold green"
+        table.add_row("Remaining:", f"[{remaining_style}]{remaining}[/{remaining_style}]")
         table.add_row("Status:", data.get("status", "").upper())
         table.add_row("Version:", data.get("version_label", ""))
         table.add_row("Scan ID:", str(data.get("id", ""))[:8])
@@ -179,7 +180,7 @@ class OutputFormatter:
 
             if suppressed > 0:
                 delta = f"(-{suppressed} {label})"
-                console.print(f"    After {display_name + ':':<28} [bold]{remaining:>5}[/bold]  [dim]{delta}[/dim]")
+                console.print(f"    After {display_name + ':':<28} [bold]{remaining:>5}[/bold]  [green]{delta}[/green]")
             elif "skipped" in label:
                 console.print(f"    After {display_name + ':':<28} [dim]{remaining:>5}  ({label})[/dim]")
             # Layers with 0 suppressed and artifact present ("no matches") are omitted for cleanliness
