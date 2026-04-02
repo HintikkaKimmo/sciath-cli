@@ -325,7 +325,16 @@ def reanalyse(
     if result is None:
         raise typer.Exit(1)
 
-    formatter.render_scan(result)
+    assessments = None
+    if explain or output_format == "json":
+        try:
+            with SciathAPI(config) as api:
+                resp = api.list_assessments(scan_id=scan_id, limit=2000)
+                assessments = resp.get("items", [])
+        except SciathAPIError:
+            pass
+
+    formatter.render_scan(result, assessments=assessments)
     raise typer.Exit(formatter.exit_code)
 
 
