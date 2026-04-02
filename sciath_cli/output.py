@@ -21,6 +21,18 @@ from rich.table import Table
 
 from sciath_cli.console import console
 
+# Human-readable names for filter layers in waterfall display
+_LAYER_DISPLAY_NAMES = {
+    "build_time": "build-time filter",
+    "kconfig": "Kconfig suppression",
+    "dtb": "DTB device tree filter",
+    "packageconfig": "PACKAGECONFIG filter",
+    "busybox": "busybox applet filter",
+    "patch": "patch detection",
+    "custom": "custom policy rules",
+    "deployment": "deployment context",
+}
+
 
 def _quality_grade(score: float) -> str:
     """Convert a 0.0-1.0 quality score to a letter grade."""
@@ -119,6 +131,10 @@ class OutputFormatter:
         console.print()
         console.print(table)
 
+        funnel = data.get("suppression_funnel")
+        if funnel and funnel.get("layers"):
+            self._render_waterfall(funnel, data)
+
         if self.explain and assessments:
             self._render_explain_table(assessments)
 
@@ -130,6 +146,62 @@ class OutputFormatter:
             console.print(f"    [dim]sciath report {scan_short}[/dim]        # Generate Article 13 report")
         console.print()
 
+    def _render_waterfall(self, funnel: dict[str, Any], data: dict[str, Any]) -> None:
+        """Render the suppression funnel as a waterfall — the 'shareable screenshot'."""
+        raw = funnel.get("raw", 0)
+        if raw == 0:
+            return
+
+        machine = data.get("yocto_machine") or ""
+        distro = data.get("yocto_distro") or ""
+        version = data.get("version_label") or ""
+        project = data.get("project_name") or ""
+
+        header_parts = [p for p in [project, version, distro, machine] if p]
+        header = f"  Scan Results: {' / '.join(header_parts)}" if header_parts else "  Scan Results"
+
+        console.print()
+        console.print(header, style="bold")
+        console.print("  " + "=" * 56)
+
+        # Raw count
+        console.print(f"    Raw CVEs from SBOM:            [bold]{raw:>5}[/bold]")
+
+        # Each layer
+        for layer in funnel.get("layers", []):
+            name = layer.get("name", "")
+            suppressed = layer.get("suppressed", 0)
+            remaining = layer.get("remaining", 0)
+            label = layer.get("label", "")
+
+            # Format the layer display name
+            display_name = _LAYER_DISPLAY_NAMES.get(name, name)
+
+            if suppressed > 0:
+                delta = f"(-{suppressed} {label})"
+                console.print(f"    After {display_name + ':':<28} [bold]{remaining:>5}[/bold]  [dim]{delta}[/dim]")
+            elif "skipped" in label:
+                console.print(f"    After {display_name + ':':<28} [dim]{remaining:>5}  ({label})[/dim]")
+            # Layers with 0 suppressed and artifact present ("no matches") are omitted for cleanliness
+
+        console.print("  " + "=" * 56)
+
+        action = funnel.get("action_required", 0)
+        if action == 0:
+            console.print(f"    ACTION REQUIRED:               [bold green]{action:>5}  ✓[/bold green]")
+        else:
+            console.print(f"    ACTION REQUIRED:               [bold]{action:>5}[/bold]")
+
+        # Severity breakdown from assessments if available — shown inline
+        # This requires assessment data we may not have; skip if not in data
+        severity_counts = data.get("severity_counts")
+        if severity_counts:
+            for level, count in severity_counts.items():
+                if count > 0:
+                    style = "bold red" if level in ("critical", "kev") else ""
+                    marker = "  <<<" if level in ("critical", "kev") else ""
+                    console.print(f"      {level.capitalize():<30} {count:>5}{marker}", style=style)
+
     def _render_explain_table(self, assessments: list[dict[str, Any]]) -> None:
         """Show filter reasoning for each assessment."""
         filtered = [a for a in assessments if a.get("filter_layer") and a["filter_layer"] != "none"]
@@ -140,21 +212,25 @@ class OutputFormatter:
         table = Table(title="FILTER REASONING", box=None, show_header=True, padding=(0, 1))
         table.add_column("CVE", style="bold")
         table.add_column("Layer", style="dim")
-        table.add_column("Layers Applied", style="dim")
         table.add_column("Status")
-        table.add_column("Reason")
+        table.add_column("Rationale")
 
         for a in filtered:
             vuln = a.get("vulnerability", {})
             status = a.get("status", "")
             color = "green" if status == "not_affected" else "red" if status == "affected" else "yellow"
-            layers = ", ".join(a.get("applied_filter_layers", [])) or a.get("filter_layer", "")
+            # Prefer suppression_rationale (artifact-specific) over justification_text (VEX narrative)
+            reason = (
+                a.get("suppression_rationale")
+                or a.get("justification_text")
+                or a.get("justification_category")
+                or "—"
+            )
             table.add_row(
                 vuln.get("vuln_id", ""),
                 a.get("filter_layer", ""),
-                layers,
                 f"[{color}]{status}[/{color}]",
-                (a.get("justification_text") or a.get("justification_category") or "—")[:80],
+                reason[:100],
             )
 
         console.print(table)
@@ -185,6 +261,10 @@ class OutputFormatter:
         if quality is not None:
             output["sbom_quality_score"] = quality
 
+        funnel = data.get("suppression_funnel")
+        if funnel:
+            output["suppression_funnel"] = funnel
+
         if assessments:
             output["assessments"] = [
                 {
@@ -199,6 +279,7 @@ class OutputFormatter:
                     "filter_layer": a.get("filter_layer", ""),
                     "applied_filter_layers": a.get("applied_filter_layers", []),
                     "justification": a.get("justification_text", ""),
+                    "suppression_rationale": a.get("suppression_rationale", ""),
                     "confidence": a.get("confidence", ""),
                     "contextual_cvss": a.get("contextual_cvss"),
                 }
@@ -207,3 +288,72 @@ class OutputFormatter:
 
         # Use sys.stdout for clean JSON (no Rich markup) when piped
         sys.stdout.write(json.dumps(output, indent=2) + "\n")
+
+
+# ============================================================
+# CRA Readiness renderer (standalone, not tied to OutputFormatter)
+# ============================================================
+
+_STATUS_ICONS = {
+    "passed": "[green]✓[/green]",
+    "failed": "[red]✗[/red]",
+    "warning": "[yellow]![/yellow]",
+    "out_of_scope": "[dim]–[/dim]",
+    "pending": "[dim]…[/dim]",
+}
+
+_VERDICT_STYLES = {
+    "shippable": ("bold green", "SHIPPABLE ✓"),
+    "not_ready": ("bold red", "NOT READY"),
+    "incomplete": ("bold yellow", "INCOMPLETE"),
+    "pending": ("bold yellow", "PENDING"),
+}
+
+
+def render_cra_readiness(data: dict[str, Any], output_format: str = "table") -> None:
+    """Render CRA readiness verdict. Works with both table and json formats."""
+    if output_format == "json":
+        sys.stdout.write(json.dumps(data, indent=2) + "\n")
+        return
+
+    if output_format == "quiet":
+        return
+
+    verdict = data.get("verdict", "unknown")
+    percentage = data.get("percentage", 0)
+    checklist = data.get("checklist", [])
+    blockers = data.get("blockers", [])
+
+    style, label = _VERDICT_STYLES.get(verdict, ("bold", verdict.upper()))
+
+    # Progress bar
+    filled = int(percentage / 5)  # 20 chars total
+    bar = "█" * filled + "░" * (20 - filled)
+
+    console.print()
+    console.print(f"  CRA READINESS: [{style}]{label}[/{style}]")
+    console.print(f"  {bar}  {percentage:.0f}% compliant")
+    console.print()
+
+    # Checklist
+    for item in checklist:
+        icon = _STATUS_ICONS.get(item.get("status", ""), " ")
+        req = item.get("requirement", "")
+        article = item.get("article", "")
+        detail = item.get("detail", "")
+
+        if item.get("status") == "out_of_scope":
+            console.print(f"  {icon} [dim]{req} ({article}) — {detail}[/dim]")
+        else:
+            console.print(f"  {icon} {req} [dim]({article})[/dim]")
+            if detail:
+                console.print(f"      [dim]{detail}[/dim]")
+
+    # Blockers summary
+    if blockers:
+        console.print()
+        console.print("  [bold red]Blockers:[/bold red]")
+        for b in blockers:
+            console.print(f"    [red]✗ {b}[/red]")
+
+    console.print()

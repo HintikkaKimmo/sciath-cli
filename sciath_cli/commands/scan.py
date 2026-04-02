@@ -21,7 +21,7 @@ from rich.table import Table
 from sciath_cli.api import NotFoundError, SciathAPI, SciathAPIError, ServerError
 from sciath_cli.config import requires_auth
 from sciath_cli.console import console
-from sciath_cli.output import OutputFormatter
+from sciath_cli.output import OutputFormatter, render_cra_readiness
 
 app = typer.Typer(help="Run and manage vulnerability scans.")
 
@@ -51,6 +51,7 @@ def run_scan(
     explain: bool = typer.Option(False, "--explain", "-e", help="Show filter reasoning per CVE"),
     severity_threshold: str = typer.Option("", "--severity-threshold", help="Exit 1 if findings >= threshold (critical/high/medium/low)"),
     fail_on_kev: bool = typer.Option(False, "--fail-on-kev", help="Exit 1 if any CISA KEV finding is open"),
+    cra_check: bool = typer.Option(False, "--cra-check", help="Show CRA readiness verdict after scan"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Skip local cache, force fresh upload"),
     config: Any = None,
 ) -> None:
@@ -184,6 +185,17 @@ def run_scan(
     _cache.save_cache(proj_id, version, sbom_raw, kconfig_raw, dtb_raw, str(result.get("id", "")), custom_filter_raw)
 
     formatter.render_scan(result, assessments=assessments)
+
+    if cra_check and result:
+        scan_id = str(result.get("id", ""))
+        if scan_id:
+            try:
+                with SciathAPI(config) as api:
+                    cra_data = api.get_cra_readiness(scan_id)
+                render_cra_readiness(cra_data, output_format=output_format)
+            except SciathAPIError:
+                console.print("  [dim]CRA readiness check unavailable[/dim]")
+
     raise typer.Exit(formatter.exit_code)
 
 
@@ -333,6 +345,29 @@ def status(
             raise typer.Exit(1)
 
     OutputFormatter(format="table").render_scan(data)
+
+
+@app.command("cra-check")
+@requires_auth
+def cra_check_cmd(
+    scan_id: str = typer.Argument(..., help="Scan ID or prefix"),
+    output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, quiet"),
+    config: Any = None,
+) -> None:
+    """Check CRA readiness for a scan."""
+    with SciathAPI(config) as api:
+        scan_id = _resolve_scan_id(api, scan_id)
+        try:
+            data = api.get_cra_readiness(scan_id)
+        except SciathAPIError as exc:
+            console.print(f"[red]✗ {exc}[/red]")
+            raise typer.Exit(1)
+
+    render_cra_readiness(data, output_format=output_format)
+
+    # Exit 1 if not shippable (useful for CI gating)
+    if data.get("verdict") != "shippable":
+        raise typer.Exit(1)
 
 
 @app.command("list")

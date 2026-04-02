@@ -300,6 +300,9 @@ class SciathAPI:
     def get_scan_status(self, scan_id: str) -> dict[str, Any]:
         return self._request("GET", f"scans/v1/{scan_id}/status/")
 
+    def get_cra_readiness(self, scan_id: str) -> dict[str, Any]:
+        return self._request("GET", f"scans/v1/{scan_id}/cra-readiness/")
+
     # ── Assessments ─────────────────────────────────────────────────────────
 
     def list_assessments(

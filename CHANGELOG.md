@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Suppression funnel waterfall.** Scan results now display a per-layer
+  suppression waterfall showing CVE count at each filter stage (build-time →
+  Kconfig → DTB → PACKAGECONFIG → busybox → patch → custom → deployment).
+  Renders in both table format (terminal) and JSON output. Skipped layers
+  show why they were skipped.
+
+- **Per-CVE suppression rationale in `--explain` mode.** The explain table now
+  shows artifact-specific rationale for each suppressed CVE (e.g.
+  `CONFIG_BT=n — subsystem not compiled (.config)`) instead of generic
+  justification categories. JSON output includes `suppression_rationale` per
+  assessment.
+
+- **CRA readiness check.** New `sciath scan cra-check <scan-id>` command
+  shows a single CRA readiness verdict (SHIPPABLE / NOT READY) with
+  article-mapped checklist, compliance percentage, and blockers. Also
+  available as `--cra-check` flag on `sciath scan run`. Exits 1 if not
+  shippable (useful for CI gating). Supports table, json, quiet formats.
+
+
 - **OAuth2 token support.** `sciath login` now supports OAuth2 bearer tokens with
   automatic refresh. Works alongside existing API key auth.
 - **`--debug` flag.** Global `--debug` flag enables verbose logging across all commands.
