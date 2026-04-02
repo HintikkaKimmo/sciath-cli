@@ -385,6 +385,23 @@ class SciathAPI:
             raise SciathAPIError("Server returned empty file")
         return response.content, _filename_from_headers(response)
 
+    def download_evidence_pack(self, scan_id: str) -> tuple[bytes, str]:
+        """GET /reports/v1/scans/{scan_id}/evidence-pack/ → (zip_bytes, filename)."""
+        response = self._client.request(
+            "GET", f"/api/reports/v1/scans/{scan_id}/evidence-pack/",
+            timeout=120.0,
+        )
+        if response.status_code == 404:
+            raise NotFoundError("Scan not found")
+        if response.status_code >= 400:
+            raise ServerError(
+                f"Evidence pack download failed ({response.status_code})",
+                status_code=response.status_code,
+            )
+        if not response.content:
+            raise SciathAPIError("Server returned empty evidence pack")
+        return response.content, _filename_from_headers(response)
+
     def export_cdx(self, scan_id: str, fmt: str = "vex_cdx", validate: bool = False) -> bytes:
         """
         GET /reports/v1/scans/{scan_id}/export/ → raw CycloneDX JSON bytes.

@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   severity (KEV first, then CVSS descending). Shows CVSS, EPSS, KEV flags,
   and survival rationale explaining why each CVE passed through filters.
 
+- **CRA Evidence Pack download.** `sciath report <scan-id> --format evidence-pack`
+  downloads a ZIP containing SBOM, VEX, Article 13 PDF, suppression rationale
+  CSV, CRA readiness verdict, and scan metadata. One command for everything
+  an auditor needs.
+
 - **CRA readiness check.** New `sciath scan cra-check <scan-id>` command
   shows a single CRA readiness verdict (SHIPPABLE / NOT READY) with
   article-mapped checklist, compliance percentage, and blockers. Also

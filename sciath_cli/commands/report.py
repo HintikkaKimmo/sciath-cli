@@ -20,6 +20,7 @@ _FORMAT_MAP = {
     "vex":  "vex_cdx",
     "csaf": "vex_csaf",
     "spdx": "sbom_spdx",
+    "evidence-pack": "evidence_pack",
 }
 _POLL_INTERVAL = 3   # seconds between status polls
 _POLL_MAX      = 60  # max polls (3 min ceiling)
@@ -34,22 +35,27 @@ def report(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
     config: Any = None,
 ) -> None:
-    """Generate and download a compliance report (Article 13 PDF, CycloneDX VEX, CSAF)."""
+    """Generate and download a compliance report (Article 13 PDF, CycloneDX VEX, CSAF, Evidence Pack)."""
     if ctx.invoked_subcommand is not None:
         return
     if scan_id is None:
-        console.print("Usage: sciath report <scan-id> [--format pdf|vex|csaf|spdx]")
+        console.print("Usage: sciath report <scan-id> [--format pdf|vex|csaf|spdx|evidence-pack]")
         raise typer.Exit(1)
 
     api_format = _FORMAT_MAP.get(fmt)
     if not api_format:
-        console.print(f"[red]✗ Unknown format '{fmt}'. Choose: pdf, vex, csaf, spdx[/red]")
+        console.print(f"[red]✗ Unknown format '{fmt}'. Choose: pdf, vex, csaf, spdx, evidence-pack[/red]")
         raise typer.Exit(1)
 
     with SciathAPI(config) as api:
         # Resolve short prefix to full UUID
         from sciath_cli.commands.scan import _resolve_scan_id
         scan_id = _resolve_scan_id(api, scan_id)
+
+        # Evidence pack uses a direct download endpoint (no generate+poll)
+        if api_format == "evidence_pack":
+            _download_evidence_pack(api, scan_id, output)
+            return
 
         with Progress(SpinnerColumn(), TextColumn("{task.description}"), transient=True) as p:
             task = p.add_task("Requesting report generation…")
@@ -99,3 +105,29 @@ def report(
 
         size_kb = len(content) // 1024
         console.print(f"[green]✓ Saved to {out_path} ({size_kb} KB)[/green]")
+
+
+def _download_evidence_pack(api: SciathAPI, scan_id: str, output: Optional[str]) -> None:
+    """Download CRA Evidence Pack ZIP."""
+    with Progress(SpinnerColumn(), TextColumn("{task.description}"), transient=True) as p:
+        p.add_task("Generating evidence pack…")
+        try:
+            content, server_filename = api.download_evidence_pack(scan_id)
+        except NotFoundError:
+            console.print(f"[red]✗ Scan '{scan_id}' not found.[/red]")
+            raise typer.Exit(1)
+        except SciathAPIError as exc:
+            console.print(f"[red]✗ {exc}[/red]")
+            raise typer.Exit(1)
+
+    out_path = Path(output) if output else Path(
+        server_filename if server_filename != "report" else f"sciath-evidence-{scan_id[:8]}.zip"
+    )
+    try:
+        out_path.write_bytes(content)
+    except IOError as exc:
+        console.print(f"[red]✗ Could not write to {out_path}: {exc}[/red]")
+        raise typer.Exit(1)
+
+    size_kb = len(content) // 1024
+    console.print(f"[green]✓ Evidence pack saved to {out_path} ({size_kb} KB)[/green]")
