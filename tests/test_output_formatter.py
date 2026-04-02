@@ -458,6 +458,78 @@ class TestWaterfallRenderer:
         parsed = json.loads(captured.getvalue())
         assert parsed["assessments"][0]["suppression_rationale"] == "CONFIG_BT=n — subsystem not compiled (.config)"
 
+    def test_explain_shows_survivors_section(self, capsys) -> None:
+        """Explain mode shows WHY THESE CVEs MATTER for surviving assessments."""
+        formatter = OutputFormatter(format="table", explain=True)
+        data = {
+            "id": "scan-uuid-survivors",
+            "status": "triage",
+            "total_components": 5,
+            "total_vulnerabilities": 2,
+            "suppressed_count": 1,
+            "remaining_count": 1,
+        }
+        assessments = [
+            {
+                "vulnerability": {"vuln_id": "CVE-2024-1111", "cvss_score": 5.0, "component": {"name": "curl"}},
+                "status": "not_affected",
+                "filter_layer": "kconfig",
+                "applied_filter_layers": ["kconfig"],
+                "suppression_rationale": "CONFIG_NET=n",
+                "confidence": "high",
+            },
+            {
+                "vulnerability": {
+                    "vuln_id": "CVE-2024-9999",
+                    "cvss_score": 9.8,
+                    "epss_score": 0.87,
+                    "is_kev": True,
+                    "component": {"name": "openssl"},
+                },
+                "status": "affected",
+                "filter_layer": "none",
+                "applied_filter_layers": [],
+                "survival_rationale": "openssl 3.0.2 present in SBOM, CVSS 9.8, EPSS 0.87, actively exploited (CISA KEV)",
+                "confidence": "high",
+            },
+        ]
+        formatter.render_scan(data, assessments=assessments)
+
+        captured = capsys.readouterr().out
+        # Should show both sections
+        assert "FILTER REASONING" in captured
+        assert "WHY THESE CVEs MATTER" in captured
+        assert "CVE-2024-9999" in captured
+        assert "openssl" in captured
+        assert "KEV" in captured
+
+    def test_explain_no_survivors_section_when_all_suppressed(self, capsys) -> None:
+        """No survivor section when all CVEs are suppressed."""
+        formatter = OutputFormatter(format="table", explain=True)
+        data = {
+            "id": "scan-uuid-allsup",
+            "status": "triage",
+            "total_components": 5,
+            "total_vulnerabilities": 1,
+            "suppressed_count": 1,
+            "remaining_count": 0,
+        }
+        assessments = [
+            {
+                "vulnerability": {"vuln_id": "CVE-2024-1111"},
+                "status": "not_affected",
+                "filter_layer": "kconfig",
+                "applied_filter_layers": ["kconfig"],
+                "suppression_rationale": "CONFIG_NET=n",
+                "confidence": "high",
+            },
+        ]
+        formatter.render_scan(data, assessments=assessments)
+
+        captured = capsys.readouterr().out
+        assert "FILTER REASONING" in captured
+        assert "WHY THESE CVEs MATTER" not in captured
+
     def test_json_omits_funnel_when_absent(self) -> None:
         """JSON output does not include suppression_funnel when not present."""
         formatter = OutputFormatter(format="json")

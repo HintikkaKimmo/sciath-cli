@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   justification categories. JSON output includes `suppression_rationale` per
   assessment.
 
+- **"Why it matters" for surviving CVEs.** `--explain` mode now shows a
+  "WHY THESE CVEs MATTER" section for unsuppressed findings, sorted by
+  severity (KEV first, then CVSS descending). Shows CVSS, EPSS, KEV flags,
+  and survival rationale explaining why each CVE passed through filters.
+
 - **CRA readiness check.** New `sciath scan cra-check <scan-id>` command
   shows a single CRA readiness verdict (SHIPPABLE / NOT READY) with
   article-mapped checklist, compliance percentage, and blockers. Also

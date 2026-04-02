@@ -203,37 +203,93 @@ class OutputFormatter:
                     console.print(f"      {level.capitalize():<30} {count:>5}{marker}", style=style)
 
     def _render_explain_table(self, assessments: list[dict[str, Any]]) -> None:
-        """Show filter reasoning for each assessment."""
-        filtered = [a for a in assessments if a.get("filter_layer") and a["filter_layer"] != "none"]
-        if not filtered:
+        """Show filter reasoning for suppressed CVEs and why survivors matter."""
+        # --- Suppressed CVEs ---
+        suppressed = [a for a in assessments if a.get("filter_layer") and a["filter_layer"] != "none"]
+        if suppressed:
+            console.print()
+            table = Table(title="FILTER REASONING", box=None, show_header=True, padding=(0, 1))
+            table.add_column("CVE", style="bold")
+            table.add_column("Layer", style="dim")
+            table.add_column("Status")
+            table.add_column("Rationale")
+
+            for a in suppressed:
+                vuln = a.get("vulnerability", {})
+                status = a.get("status", "")
+                color = "green" if status == "not_affected" else "red" if status == "affected" else "yellow"
+                reason = (
+                    a.get("suppression_rationale")
+                    or a.get("justification_text")
+                    or a.get("justification_category")
+                    or "—"
+                )
+                table.add_row(
+                    vuln.get("vuln_id", ""),
+                    a.get("filter_layer", ""),
+                    f"[{color}]{status}[/{color}]",
+                    reason[:100],
+                )
+
+            console.print(table)
+
+        # --- Surviving CVEs (why they matter) ---
+        survivors = [
+            a for a in assessments
+            if a.get("status") in ("affected", "under_investigation")
+        ]
+        if not survivors:
             return
 
-        console.print()
-        table = Table(title="FILTER REASONING", box=None, show_header=True, padding=(0, 1))
-        table.add_column("CVE", style="bold")
-        table.add_column("Layer", style="dim")
-        table.add_column("Status")
-        table.add_column("Rationale")
-
-        for a in filtered:
-            vuln = a.get("vulnerability", {})
-            status = a.get("status", "")
-            color = "green" if status == "not_affected" else "red" if status == "affected" else "yellow"
-            # Prefer suppression_rationale (artifact-specific) over justification_text (VEX narrative)
-            reason = (
-                a.get("suppression_rationale")
-                or a.get("justification_text")
-                or a.get("justification_category")
-                or "—"
+        # Sort by CVSS descending, KEV first
+        survivors.sort(
+            key=lambda a: (
+                not a.get("vulnerability", {}).get("is_kev", False),
+                -(a.get("vulnerability", {}).get("cvss_score") or 0),
             )
+        )
+
+        console.print()
+        table = Table(title="WHY THESE CVEs MATTER", box=None, show_header=True, padding=(0, 1))
+        table.add_column("CVE", style="bold")
+        table.add_column("Component")
+        table.add_column("CVSS")
+        table.add_column("EPSS")
+        table.add_column("Flags", style="dim")
+        table.add_column("Why it survived")
+
+        for a in survivors[:30]:  # Cap at 30 to avoid overwhelming output
+            vuln = a.get("vulnerability", {})
+            cvss = vuln.get("cvss_score")
+            epss = vuln.get("epss_score")
+            is_kev = vuln.get("is_kev", False)
+            component = vuln.get("component", {}).get("name", "")
+
+            cvss_str = f"{cvss:.1f}" if cvss is not None else "—"
+            epss_str = f"{epss:.2f}" if epss is not None and epss > 0 else "—"
+            cvss_style = "bold red" if cvss and cvss >= 9.0 else "bold yellow" if cvss and cvss >= 7.0 else ""
+
+            flags = []
+            if is_kev:
+                flags.append("[red]KEV[/red]")
+            if cvss and cvss >= 9.0:
+                flags.append("[red]Critical[/red]")
+
+            survival = a.get("survival_rationale") or "No filter matched"
+
             table.add_row(
                 vuln.get("vuln_id", ""),
-                a.get("filter_layer", ""),
-                f"[{color}]{status}[/{color}]",
-                reason[:100],
+                component[:20],
+                f"[{cvss_style}]{cvss_str}[/{cvss_style}]" if cvss_style else cvss_str,
+                epss_str,
+                " ".join(flags) if flags else "—",
+                survival[:80],
             )
 
         console.print(table)
+
+        if len(survivors) > 30:
+            console.print(f"  [dim]... and {len(survivors) - 30} more[/dim]")
 
     def _render_json(self, data: dict[str, Any], assessments: list[dict[str, Any]] | None) -> None:
         """Composable JSON output with summary and optional reasoning."""
@@ -280,6 +336,7 @@ class OutputFormatter:
                     "applied_filter_layers": a.get("applied_filter_layers", []),
                     "justification": a.get("justification_text", ""),
                     "suppression_rationale": a.get("suppression_rationale", ""),
+                    "survival_rationale": a.get("survival_rationale", ""),
                     "confidence": a.get("confidence", ""),
                     "contextual_cvss": a.get("contextual_cvss"),
                 }
