@@ -143,3 +143,96 @@ After running "Ingest selected", the system:
 - **Meta layer:** `https://github.com/varigit/meta-variscite-bsp-imx.git` (branch: `scarthgap_6.6.52-2.2.2_var01`)
 - **Result:** 17 patches, 4 git sources
 - **Note:** Non-standard branch naming. Check `git ls-remote` for available branches.
+
+## Kernel Fork Analysis (Pattern B/C vendors)
+
+For vendors with kernel forks, the meta layer ingestion captures file patches
+but misses the real CVE fixes. Run kernel fork analysis separately:
+
+### Step 1: Build the vulns.git index (one-time)
+
+```bash
+sciath bsp build-vulns-index
+# Or manually:
+python -c "
+from sciath_cli.discovery.vulns_corpus import clone_vulns_repo, build_index, save_index
+from pathlib import Path
+import tempfile
+with tempfile.TemporaryDirectory() as tmp:
+    repo = clone_vulns_repo(Path(tmp) / 'vulns')
+    index = build_index(repo)
+    save_index(index, Path('sciath_cli/discovery/data/vulns_index.json'))
+    print(f'{index.total_cves} CVEs indexed')
+"
+```
+
+This produces ~5MB JSON with 10,994+ CVEs and their fix commits.
+
+### Step 2: Identify the kernel fork
+
+In Django admin, the kernel fork URL should be in the BSP repo record.
+If not, find it in the meta layer's kernel recipe:
+
+```bash
+grep -r "SRC_URI.*git://" <meta-layer>/recipes-kernel/linux/
+```
+
+### Step 3: Find the correct branch
+
+```bash
+git ls-remote --heads <kernel-fork-url> | grep "6.6"
+```
+
+Common patterns:
+- Toradex: `toradex_6.6-2.2.x-imx` (note the `-imx` suffix)
+- PHYTEC: `v6.6/master`
+- Variscite: `lf-6.6.y`
+- NXP: `lf-6.6.y`
+
+### Step 4: Run the analysis
+
+```python
+from sciath_cli.discovery.vulns_corpus import load_index
+from sciath_cli.discovery.kernel_fork import analyze_kernel_fork, clone_kernel_fork
+from pathlib import Path
+
+index = load_index(Path('sciath_cli/discovery/data/vulns_index.json'))
+
+with tempfile.TemporaryDirectory() as tmp:
+    fork = clone_kernel_fork('<kernel-fork-url>', Path(tmp) / 'kernel', branch='<branch>')
+    analysis = analyze_kernel_fork(fork, '<branch>', '<vendor>', index)
+    print(analysis.summary())
+    for m in analysis.cve_matches:
+        print(f"  {m['cve_id']}: {m['subject'][:60]}")
+```
+
+### Real results (April 2026)
+
+| Vendor | Branch | Commits | CVE Matches | Method |
+|--------|--------|---------|-------------|--------|
+| Toradex | toradex_6.6-2.2.x-imx | 500 | 7 | commit hash + subject |
+
+Note: 7 matches from 500 commits with hash-only matching. Patch-id fingerprinting
+against the full vulns.git branch fix corpus will increase this number.
+
+## Internal: Vendor Patch Format Reference
+
+Each BSP vendor handles patches differently. This reference documents the
+specific patterns discovered during ingestion for each supported vendor.
+
+| Vendor | Patch Location | Kernel Source | Branch Naming | Notes |
+|--------|---------------|---------------|---------------|-------|
+| **Toradex** | 4 file patches in meta-toradex-nxp (u-boot, ATF, ISP) | git://git.toradex.com/linux-toradex.git | `toradex_6.6-X.X.x-imx` | Kernel patches are ALL in the fork. Meta layer has almost none. |
+| **RPi** | 102 file patches in meta-raspberrypi | Uses upstream linux-raspberrypi (not a vendor fork in meta layer) | `scarthgap` | Community layer. Well-structured. CVE tags in filenames. |
+| **PHYTEC** | 40 file patches in meta-phytec | git://github.com/phytec/linux-phytec-ti.git | `v6.6/master` | Hybrid. DTS and config patches in meta layer, kernel security in fork. 262 kconfig keys. |
+| **Variscite** | 17 file patches in meta-variscite-bsp-imx | git://github.com/varigit/linux-imx.git | `lf-6.6.y` | Non-standard branch naming with version+variant suffix. |
+
+### What to document for each new BSP
+
+When onboarding a new vendor, record:
+1. Which meta layer(s) contain kernel recipes
+2. Whether the kernel is a file:// patch layer or a git:// fork (or both)
+3. The exact kernel fork URL and branch name
+4. Any non-standard branch naming conventions
+5. Where kconfig fragments live (in the meta layer or only in the kernel fork)
+6. Whether patches have CVE tags or Upstream-Status headers
