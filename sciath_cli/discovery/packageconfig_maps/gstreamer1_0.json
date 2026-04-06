@@ -1,0 +1,52 @@
+{
+  "recipe": "gstreamer1.0",
+  "version_range": ">=1.20",
+  "description": "GStreamer PACKAGECONFIG flags that affect CVE applicability",
+  "flags": {
+    "orc": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "orc_compiler",
+      "confidence": "high",
+      "notes": "Disables ORC (Optimized Inner Loops Runtime Compiler)."
+    },
+    "libav": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2024-31585",
+        "CVE-2024-31582"
+      ],
+      "cpe_component": "libav",
+      "confidence": "medium",
+      "notes": "Disables libav/FFmpeg-based codec plugins. Codec parsing CVEs not applicable when libav plugin removed."
+    },
+    "flac": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "flac",
+      "confidence": "high",
+      "notes": "Disables FLAC codec plugin."
+    },
+    "mpg123": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "mpg123",
+      "confidence": "high",
+      "notes": "Disables MP3 decoding via mpg123."
+    },
+    "soup": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "http_source",
+      "confidence": "high",
+      "notes": "Disables HTTP source element via libsoup."
+    },
+    "vpx": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "vpx",
+      "confidence": "high",
+      "notes": "Disables VP8/VP9 codec support."
+    }
+  }
+}

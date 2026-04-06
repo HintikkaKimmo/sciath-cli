@@ -58,6 +58,18 @@ build-backend = "hatchling.build"
 [tool.hatch.version]
 path = "sciath_cli/__init__.py"
 
+[tool.hatch.build.targets.wheel]
+packages = ["sciath_cli"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+
+[tool.hatch.build]
+include = [
+    "sciath_cli/**/*.py",
+    "sciath_cli/discovery/packageconfig_maps/*.json",
+    "sciath_cli/meta_layer/**/*",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

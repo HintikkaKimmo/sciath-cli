@@ -1,0 +1,116 @@
+{
+  "recipe": "curl",
+  "version_range": ">=7.80",
+  "description": "curl PACKAGECONFIG flags that affect CVE applicability",
+  "flags": {
+    "ldap": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-28322",
+        "CVE-2024-2004"
+      ],
+      "cpe_component": "ldap",
+      "confidence": "high",
+      "notes": "Disables LDAP/LDAPS protocol handler. LDAP-specific CVEs not applicable when protocol support removed."
+    },
+    "rtsp": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2020-8287"
+      ],
+      "cpe_component": "rtsp",
+      "confidence": "high",
+      "notes": "Disables RTSP protocol handler."
+    },
+    "ftp": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-27535",
+        "CVE-2023-27536"
+      ],
+      "cpe_component": "ftp",
+      "confidence": "high",
+      "notes": "Disables FTP/FTPS protocol handler. FTP connection reuse and wildcard CVEs not applicable."
+    },
+    "smtp": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "smtp",
+      "confidence": "high",
+      "notes": "Disables SMTP protocol handler."
+    },
+    "imap": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "imap",
+      "confidence": "high",
+      "notes": "Disables IMAP protocol handler."
+    },
+    "pop3": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "pop3",
+      "confidence": "high",
+      "notes": "Disables POP3 protocol handler."
+    },
+    "tftp": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "tftp",
+      "confidence": "high",
+      "notes": "Disables TFTP protocol handler."
+    },
+    "telnet": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-27533"
+      ],
+      "cpe_component": "telnet",
+      "confidence": "high",
+      "notes": "Disables Telnet protocol handler. Telnet IAC injection CVE not applicable."
+    },
+    "libssh2": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-48795"
+      ],
+      "cpe_component": "scp_sftp",
+      "confidence": "medium",
+      "notes": "Disables SCP/SFTP via libssh2. Terrapin SSH attack not applicable through curl. Note: CVE is in the SSH protocol, suppression confidence is medium."
+    },
+    "gopher": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "gopher",
+      "confidence": "high",
+      "notes": "Disables Gopher protocol handler."
+    },
+    "dict": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "dict",
+      "confidence": "high",
+      "notes": "Disables DICT protocol handler."
+    },
+    "nghttp2": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-44487",
+        "CVE-2024-2398"
+      ],
+      "cpe_component": "http2",
+      "confidence": "medium",
+      "notes": "Disables HTTP/2 support. HTTP/2 rapid reset and CONTINUATION frame CVEs not applicable. Note: some CVEs are in nghttp2, not curl itself."
+    },
+    "proxy": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2022-27780",
+        "CVE-2023-27534"
+      ],
+      "cpe_component": "proxy",
+      "confidence": "high",
+      "notes": "Disables proxy protocol support. Proxy-specific HSTS and path traversal CVEs not applicable."
+    }
+  }
+}

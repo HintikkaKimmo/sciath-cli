@@ -1,0 +1,70 @@
+{
+  "recipe": "wpa-supplicant",
+  "version_range": ">=2.10",
+  "description": "wpa_supplicant PACKAGECONFIG flags that affect CVE applicability",
+  "flags": {
+    "mesh": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "mesh",
+      "confidence": "high",
+      "notes": "Disables 802.11s mesh networking."
+    },
+    "eap-fast": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "eap_fast",
+      "confidence": "high",
+      "notes": "Disables EAP-FAST authentication method."
+    },
+    "eap-pwd": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2019-9495",
+        "CVE-2019-9497",
+        "CVE-2019-9498",
+        "CVE-2019-9499"
+      ],
+      "cpe_component": "eap_pwd",
+      "confidence": "high",
+      "notes": "Disables EAP-PWD authentication. Dragonblood side-channel and reflection CVEs not applicable."
+    },
+    "sae": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2019-9494",
+        "CVE-2019-9496"
+      ],
+      "cpe_component": "sae",
+      "confidence": "high",
+      "notes": "Disables SAE (WPA3 key exchange). Dragonblood SAE-specific CVEs not applicable."
+    },
+    "pmf": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "pmf",
+      "confidence": "high",
+      "notes": "Disables Protected Management Frames (802.11w)."
+    },
+    "p2p": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2021-27803",
+        "CVE-2021-0326"
+      ],
+      "cpe_component": "p2p",
+      "confidence": "high",
+      "notes": "Disables Wi-Fi Direct (P2P). P2P group formation and provision discovery CVEs not applicable."
+    },
+    "dpp": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2022-23303",
+        "CVE-2022-23304"
+      ],
+      "cpe_component": "dpp",
+      "confidence": "high",
+      "notes": "Disables Device Provisioning Protocol (Easy Connect). DPP-specific CVEs not applicable."
+    }
+  }
+}

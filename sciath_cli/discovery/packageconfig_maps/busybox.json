@@ -1,0 +1,106 @@
+{
+  "recipe": "busybox",
+  "version_range": ">=1.35",
+  "description": "Busybox PACKAGECONFIG/applet flags that affect CVE applicability. Note: busybox uses Kconfig-style CONFIG_ flags rather than PACKAGECONFIG, but these are extracted the same way from the busybox .config.",
+  "flags": {
+    "CONFIG_ASH": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2011-2716",
+        "CVE-2021-42373"
+      ],
+      "cpe_component": "ash_shell",
+      "confidence": "high",
+      "notes": "Disables the ash shell applet."
+    },
+    "CONFIG_WGET": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2018-1000500",
+        "CVE-2021-42374"
+      ],
+      "cpe_component": "wget",
+      "confidence": "high",
+      "notes": "Disables wget applet. Download-related CVEs not applicable."
+    },
+    "CONFIG_UDHCPC": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2011-2716",
+        "CVE-2019-5747"
+      ],
+      "cpe_component": "udhcpc",
+      "confidence": "high",
+      "notes": "Disables DHCP client applet."
+    },
+    "CONFIG_UDHCPD": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2019-5747"
+      ],
+      "cpe_component": "udhcpd",
+      "confidence": "high",
+      "notes": "Disables DHCP server applet."
+    },
+    "CONFIG_NTPD": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "ntpd",
+      "confidence": "high",
+      "notes": "Disables NTP daemon applet."
+    },
+    "CONFIG_HTTPD": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2018-20679",
+        "CVE-2021-42375"
+      ],
+      "cpe_component": "httpd",
+      "confidence": "high",
+      "notes": "Disables built-in HTTP server applet."
+    },
+    "CONFIG_TELNETD": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "telnetd",
+      "confidence": "high",
+      "notes": "Disables telnet daemon applet."
+    },
+    "CONFIG_GUNZIP": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2021-42374"
+      ],
+      "cpe_component": "decompress",
+      "confidence": "medium",
+      "notes": "Disables gunzip. Decompression-related CVEs may also affect other decompression applets."
+    },
+    "CONFIG_LZMA": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2021-42374"
+      ],
+      "cpe_component": "lzma",
+      "confidence": "medium",
+      "notes": "Disables LZMA decompression."
+    },
+    "CONFIG_AWK": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2021-42376",
+        "CVE-2021-42378",
+        "CVE-2021-42379",
+        "CVE-2021-42380",
+        "CVE-2021-42381",
+        "CVE-2021-42382",
+        "CVE-2021-42383",
+        "CVE-2021-42384",
+        "CVE-2021-42385",
+        "CVE-2021-42386"
+      ],
+      "cpe_component": "awk",
+      "confidence": "high",
+      "notes": "Disables awk applet. Multiple use-after-free CVEs in awk not applicable."
+    }
+  }
+}

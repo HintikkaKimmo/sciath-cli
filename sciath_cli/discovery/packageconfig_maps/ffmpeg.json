@@ -1,0 +1,66 @@
+{
+  "recipe": "ffmpeg",
+  "version_range": ">=5.0",
+  "description": "FFmpeg PACKAGECONFIG flags that affect CVE applicability",
+  "flags": {
+    "libx264": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "h264_encoder",
+      "confidence": "high",
+      "notes": "Disables H.264 encoding via x264."
+    },
+    "libx265": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "h265_encoder",
+      "confidence": "high",
+      "notes": "Disables H.265/HEVC encoding via x265."
+    },
+    "libvpx": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-5217",
+        "CVE-2024-5197"
+      ],
+      "cpe_component": "vpx",
+      "confidence": "medium",
+      "notes": "Disables VP8/VP9 codec via libvpx. Heap buffer overflow CVEs not applicable. Note: CVEs are in libvpx, not ffmpeg."
+    },
+    "libvorbis": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "vorbis",
+      "confidence": "high",
+      "notes": "Disables Vorbis audio codec."
+    },
+    "libopus": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "opus",
+      "confidence": "high",
+      "notes": "Disables Opus audio codec."
+    },
+    "gpl": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "gpl_codecs",
+      "confidence": "medium",
+      "notes": "Disables GPL-licensed codecs. Reduces attack surface from GPL codec implementations."
+    },
+    "avdevice": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "avdevice",
+      "confidence": "high",
+      "notes": "Disables libavdevice (capture/playback devices)."
+    },
+    "avfilter": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "avfilter",
+      "confidence": "high",
+      "notes": "Disables libavfilter (audio/video filters)."
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "recipe": "dbus",
+  "version_range": ">=1.14",
+  "description": "D-Bus PACKAGECONFIG flags that affect CVE applicability",
+  "flags": {
+    "user-session": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "user_session",
+      "confidence": "high",
+      "notes": "Disables per-user session bus. Reduces attack surface for local privilege escalation."
+    },
+    "systemd": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "systemd_integration",
+      "confidence": "high",
+      "notes": "Disables systemd socket activation integration."
+    },
+    "x11-autolaunch": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2020-12049"
+      ],
+      "cpe_component": "x11_autolaunch",
+      "confidence": "medium",
+      "notes": "Disables X11 autolaunch. File descriptor leak CVE less relevant without X11."
+    }
+  }
+}

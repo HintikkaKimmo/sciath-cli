@@ -1,0 +1,83 @@
+{
+  "recipe": "systemd",
+  "version_range": ">=250",
+  "description": "systemd PACKAGECONFIG flags that affect CVE applicability",
+  "flags": {
+    "networkd": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-7008",
+        "CVE-2024-31083"
+      ],
+      "cpe_component": "networkd",
+      "confidence": "high",
+      "notes": "Disables systemd-networkd network manager. Network configuration CVEs not applicable."
+    },
+    "resolved": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-7008",
+        "CVE-2023-43641",
+        "CVE-2022-3821"
+      ],
+      "cpe_component": "resolved",
+      "confidence": "high",
+      "notes": "Disables systemd-resolved DNS resolver. DNS DNSSEC and stub resolver CVEs not applicable."
+    },
+    "timesyncd": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "timesyncd",
+      "confidence": "high",
+      "notes": "Disables systemd-timesyncd NTP client."
+    },
+    "coredump": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2022-4415"
+      ],
+      "cpe_component": "coredump",
+      "confidence": "high",
+      "notes": "Disables systemd-coredump. Core dump handling CVEs not applicable."
+    },
+    "homed": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-26604"
+      ],
+      "cpe_component": "homed",
+      "confidence": "high",
+      "notes": "Disables systemd-homed home directory manager."
+    },
+    "machined": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "machined",
+      "confidence": "high",
+      "notes": "Disables systemd-machined container/VM manager."
+    },
+    "importd": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "importd",
+      "confidence": "high",
+      "notes": "Disables systemd-importd image import daemon."
+    },
+    "polkit": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2021-4034"
+      ],
+      "cpe_component": "polkit",
+      "confidence": "medium",
+      "notes": "Disables PolicyKit integration. PwnKit CVE is in polkit itself, but systemd's polkit support enables the attack surface."
+    },
+    "journal-remote": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "journal_remote",
+      "confidence": "high",
+      "notes": "Disables remote journal reception."
+    }
+  }
+}

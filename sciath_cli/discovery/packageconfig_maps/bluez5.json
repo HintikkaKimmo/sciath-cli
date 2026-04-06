@@ -1,0 +1,47 @@
+{
+  "recipe": "bluez5",
+  "version_range": ">=5.66",
+  "description": "BlueZ 5 PACKAGECONFIG flags that affect CVE applicability",
+  "flags": {
+    "mesh": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2022-39176",
+        "CVE-2022-39177"
+      ],
+      "cpe_component": "mesh",
+      "confidence": "high",
+      "notes": "Disables Bluetooth Mesh support. Mesh provisioning CVEs not applicable."
+    },
+    "btpclient": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "btpclient",
+      "confidence": "high",
+      "notes": "Disables BTP test client."
+    },
+    "midi": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "midi",
+      "confidence": "high",
+      "notes": "Disables MIDI over Bluetooth LE."
+    },
+    "obex": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [
+        "CVE-2023-27349"
+      ],
+      "cpe_component": "obex",
+      "confidence": "high",
+      "notes": "Disables OBEX file transfer profile. OBEX push CVEs not applicable."
+    },
+    "audio": {
+      "effect": "feature_disabled",
+      "suppresses_cves": [],
+      "cpe_component": "a2dp_hfp",
+      "confidence": "high",
+      "notes": "Disables A2DP/HFP audio profiles."
+    }
+  }
+}
