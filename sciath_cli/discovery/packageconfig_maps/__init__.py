@@ -90,6 +90,14 @@ def lookup_suppressions(recipe: str, enabled_flags: list[str]) -> list[str]:
     Returns a list of CVE IDs that can be suppressed because the relevant
     feature is either disabled (flag not in enabled_flags) or enabled
     (flag in enabled_flags), depending on the mapping's effect type.
+
+    Effect types:
+      - feature_disabled: flag ABSENT means feature is compiled out → suppress
+        (e.g., "ftp" not in PACKAGECONFIG → FTP protocol not built)
+      - feature_enabled: flag PRESENT means hardening is active → suppress
+        (e.g., "hardening" in PACKAGECONFIG → hardening mitigations active)
+      - negated_flag: flag PRESENT means feature is disabled → suppress
+        (e.g., "no-ssl3" in PACKAGECONFIG → SSL3 is compiled out)
     """
     mapping = load_map(recipe)
     if mapping is None:
@@ -106,10 +114,14 @@ def lookup_suppressions(recipe: str, enabled_flags: list[str]) -> list[str]:
         cves = flag_data.get("suppresses_cves", [])
 
         if effect == "feature_disabled" and flag_name not in enabled_set:
-            # Feature is compiled out — CVEs don't apply
+            # Flag absent → feature is compiled out → CVEs don't apply
             suppressed.extend(cves)
         elif effect == "feature_enabled" and flag_name in enabled_set:
-            # Feature explicitly enabled with hardening — CVEs mitigated
+            # Flag present → hardening active → CVEs mitigated
+            suppressed.extend(cves)
+        elif effect == "negated_flag" and flag_name in enabled_set:
+            # Flag present → feature is explicitly disabled → CVEs don't apply
+            # Used for OpenSSL-style "no-ssl3", "no-comp" flags
             suppressed.extend(cves)
 
     return suppressed

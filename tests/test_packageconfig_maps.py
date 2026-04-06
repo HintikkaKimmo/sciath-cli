@@ -84,39 +84,21 @@ class TestLoadMap:
 
 
 class TestLookupSuppressions:
-    def test_openssl_no_ssl3_present_means_ssl3_disabled(self):
-        """OpenSSL 'no-ssl3' in PACKAGECONFIG means SSL3 is compiled out.
-
-        The flag name 'no-ssl3' is a compile-time disable flag. When present
-        in PACKAGECONFIG, the feature IS disabled. The loader uses
-        effect=feature_disabled + flag NOT in enabled_set → suppress.
-
-        For 'no-' prefix flags this means: when the flag IS present, the
-        feature IS disabled, but the current loader interprets 'present' as
-        'enabled' so it does NOT suppress. This is intentional: for OpenSSL,
-        'no-ssl3' appearing in PACKAGECONFIG means the user explicitly asked
-        to disable SSL3, and the flag being in the enabled set means the
-        'disable' action is active. The suppression logic treats the flag
-        name as an opaque token — it suppresses when the flag is ABSENT
-        (meaning the disable was not requested, feature might be on).
-
-        For correctness: no-ssl3 ABSENT → ssl3 might be on → CVEs apply (no suppress)
-        no-ssl3 PRESENT → ssl3 is off → CVEs should be suppressed
-
-        The current logic gets this backwards for 'no-' flags. We track this
-        as a known limitation. The workaround: OpenSSL maps should use
-        effect=feature_enabled for 'no-' flags (flag present → suppress).
-        """
-        # With effect=feature_disabled: flag present → NOT suppressed (wrong for no- flags)
+    def test_openssl_no_ssl3_present_suppresses_poodle(self):
+        """no-ssl3 in PACKAGECONFIG means SSL3 is compiled out → POODLE suppressed."""
         suppressed = lookup_suppressions("openssl", ["no-ssl3"])
-        assert "CVE-2014-3566" not in suppressed  # Current behavior (known limitation)
+        assert "CVE-2014-3566" in suppressed  # POODLE
 
-    def test_openssl_ssl3_enabled_when_no_flag_absent(self):
-        """When no-ssl3 is NOT in PACKAGECONFIG, SSL3 might be compiled in."""
+    def test_openssl_no_ssl3_absent_means_ssl3_might_be_on(self):
+        """no-ssl3 NOT in PACKAGECONFIG means SSL3 might be compiled in → no suppression."""
         suppressed = lookup_suppressions("openssl", [])
-        # flag absent → feature_disabled triggers → suppresses (this is also wrong
-        # for no- flags, but documents current behavior)
-        assert "CVE-2014-3566" in suppressed
+        assert "CVE-2014-3566" not in suppressed
+
+    def test_openssl_no_comp_suppresses_crime(self):
+        """no-comp in PACKAGECONFIG disables TLS compression → CRIME suppressed."""
+        suppressed = lookup_suppressions("openssl", ["no-comp", "no-ssl3"])
+        assert "CVE-2012-4929" in suppressed  # CRIME
+        assert "CVE-2014-3566" in suppressed  # POODLE (from no-ssl3)
 
     def test_wpa_supplicant_without_p2p(self):
         """If p2p flag is not enabled, P2P CVEs should be suppressed."""
@@ -230,7 +212,7 @@ class TestMapStructure:
             assert "effect" in flag_data, f"{recipe}/{flag_name}: missing 'effect'"
             assert "suppresses_cves" in flag_data, f"{recipe}/{flag_name}: missing 'suppresses_cves'"
             assert "confidence" in flag_data, f"{recipe}/{flag_name}: missing 'confidence'"
-            assert flag_data["effect"] in ("feature_disabled", "feature_enabled"), (
+            assert flag_data["effect"] in ("feature_disabled", "feature_enabled", "negated_flag"), (
                 f"{recipe}/{flag_name}: invalid effect '{flag_data['effect']}'"
             )
             assert flag_data["confidence"] in ("high", "medium", "low"), (

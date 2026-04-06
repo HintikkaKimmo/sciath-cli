@@ -4,7 +4,7 @@
   "description": "OpenSSL PACKAGECONFIG flags that affect CVE applicability",
   "flags": {
     "no-ssl3": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [
         "CVE-2014-3566",
         "CVE-2014-8730",
@@ -15,7 +15,7 @@
       "notes": "Disables SSLv3 protocol entirely at compile time. POODLE and related attacks not applicable."
     },
     "no-ssl2": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [
         "CVE-2016-0800",
         "CVE-2011-0014"
@@ -25,7 +25,7 @@
       "notes": "Disables SSLv2 protocol. DROWN attack not applicable. Already removed in OpenSSL 1.1.0+."
     },
     "no-tls1": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [
         "CVE-2011-3389",
         "CVE-2013-0169"
@@ -35,14 +35,14 @@
       "notes": "Disables TLS 1.0. BEAST and Lucky13 on TLS 1.0 not applicable. Some CVEs may also affect TLS 1.1/1.2."
     },
     "no-tls1_1": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [],
       "cpe_component": "tls1_1",
       "confidence": "high",
       "notes": "Disables TLS 1.1. Few CVEs are TLS 1.1-specific; most affect the broader TLS stack."
     },
     "no-weak-ssl-ciphers": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [
         "CVE-2016-2183",
         "CVE-2015-4000",
@@ -53,14 +53,14 @@
       "notes": "Removes DES, 3DES, RC4, export ciphers. SWEET32 and Logjam not applicable when weak ciphers removed."
     },
     "no-deprecated": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [],
       "cpe_component": "deprecated_apis",
       "confidence": "low",
       "notes": "Removes deprecated API functions. May suppress CVEs in deprecated codepaths but coverage varies by version."
     },
     "no-comp": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [
         "CVE-2012-4929",
         "CVE-2013-3587"
@@ -70,7 +70,7 @@
       "notes": "Disables TLS compression. CRIME attack not applicable."
     },
     "no-idea": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [
         "CVE-2016-2105"
       ],
@@ -79,21 +79,21 @@
       "notes": "Removes IDEA cipher. Specific IDEA-related vulnerabilities not applicable."
     },
     "no-md2": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [],
       "cpe_component": "md2",
       "confidence": "high",
       "notes": "Removes MD2 hash. Already not compiled by default in modern OpenSSL."
     },
     "no-rc5": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [],
       "cpe_component": "rc5",
       "confidence": "high",
       "notes": "Removes RC5 cipher."
     },
     "no-hw": {
-      "effect": "feature_disabled",
+      "effect": "negated_flag",
       "suppresses_cves": [],
       "cpe_component": "hardware_engines",
       "confidence": "low",
