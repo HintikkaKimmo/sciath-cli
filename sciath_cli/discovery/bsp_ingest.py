@@ -31,6 +31,7 @@ class BspProfile:
     analyzed_commit: str = ""
     analyzed_date: str = ""
     patches: list[dict[str, Any]] = field(default_factory=list)
+    git_sources: list[dict[str, str]] = field(default_factory=list)
     suppressions: list[dict[str, str]] = field(default_factory=list)
     kernel_config: dict[str, str] = field(default_factory=dict)
     ambiguous_configs: list[str] = field(default_factory=list)
@@ -93,6 +94,16 @@ def ingest_bsp(
                     "evidence": f"Patch {patch.file_path.name} in recipe {patch.recipe}, "
                                 f"upstream status: {patch.upstream_status or 'unknown'}",
                 })
+
+    # Collect git source references (forked kernels, u-boot, etc.)
+    for recipe in layer_info.recipes:
+        for src in recipe.git_sources:
+            profile.git_sources.append({
+                "uri": src.uri,
+                "recipe": src.recipe,
+                "branch": src.branch,
+                "srcrev": src.srcrev,
+            })
 
     # Merge kernel config fragments
     _merge_kconfig_fragments(layer_info.kernel_config_fragments, profile)

@@ -49,12 +49,23 @@ class PatchInfo:
 
 
 @dataclass
+class GitSourceInfo:
+    """A git:// source reference found in a recipe's SRC_URI."""
+
+    uri: str
+    recipe: str
+    branch: str = ""
+    srcrev: str = ""
+
+
+@dataclass
 class RecipeInfo:
     """Information about a recipe (.bb or .bbappend) in a BSP layer."""
 
     file_path: Path
     name: str
     patches: list[PatchInfo] = field(default_factory=list)
+    git_sources: list[GitSourceInfo] = field(default_factory=list)
     filesextrapaths: list[str] = field(default_factory=list)
     parse_errors: list[str] = field(default_factory=list)
 
@@ -186,6 +197,15 @@ def _parse_recipe(recipe_file: Path, layer_path: Path) -> RecipeInfo:
         else:
             recipe.parse_errors.append(f"Cannot resolve patch: {patch_ref}")
 
+    # Extract git:// source references (forked kernels, u-boot, etc.)
+    recipe.git_sources = _extract_git_sources(text, name)
+
+    # Scan for orphan patches: .patch/.diff files next to the recipe
+    # that aren't in SRC_URI (common in vendor layers)
+    referenced_names = {Path(ref).name for ref in patch_refs}
+    orphans = _find_orphan_patches(recipe_file, name, layer_path, referenced_names)
+    recipe.patches.extend(orphans)
+
     return recipe
 
 
@@ -287,3 +307,67 @@ def _analyze_patch(patch_path: Path, recipe: str) -> PatchInfo:
         info.classification = "unknown"
 
     return info
+
+
+def _extract_git_sources(text: str, recipe_name: str) -> list[GitSourceInfo]:
+    """Extract git:// and https:// source URIs from SRC_URI."""
+    sources = []
+    git_uri_re = re.compile(r'((?:git|https?)://[^\s;"]+)')
+    branch_re = re.compile(r'branch=([^\s;]+)')
+    srcrev_re = re.compile(r'SRCREV\s*=\s*"([^"]+)"')
+
+    srcrev = ""
+    srcrev_match = srcrev_re.search(text)
+    if srcrev_match:
+        srcrev = srcrev_match.group(1)
+
+    for pattern in [_SRC_URI_RE, _SRC_URI_APPEND_RE]:
+        for match in pattern.finditer(text):
+            uri_block = match.group(1).replace("\\\n", " ")
+            for entry in uri_block.split():
+                entry = entry.strip()
+                git_match = git_uri_re.match(entry)
+                if git_match and ".git" in entry:
+                    uri = git_match.group(1)
+                    branch = ""
+                    branch_match = branch_re.search(entry)
+                    if branch_match:
+                        branch = branch_match.group(1)
+                    sources.append(GitSourceInfo(
+                        uri=uri,
+                        recipe=recipe_name,
+                        branch=branch,
+                        srcrev=srcrev,
+                    ))
+
+    return sources
+
+
+def _find_orphan_patches(
+    recipe_file: Path,
+    recipe_name: str,
+    layer_path: Path,
+    referenced_names: set[str],
+) -> list[PatchInfo]:
+    """Find .patch/.diff files near a recipe that aren't in SRC_URI.
+
+    Vendor layers often have patches in files/ or recipe-name/ directories
+    that are applied via bbappend or FILESPATH without explicit file:// URIs.
+    """
+    orphans: list[PatchInfo] = []
+    recipe_dir = recipe_file.parent
+
+    search_dirs = [
+        recipe_dir / recipe_name,
+        recipe_dir / "files",
+    ]
+
+    for search_dir in search_dirs:
+        if not search_dir.exists():
+            continue
+        for patch_file in search_dir.iterdir():
+            if patch_file.suffix in (".patch", ".diff") and patch_file.name not in referenced_names:
+                patch_info = _analyze_patch(patch_file, recipe_name)
+                orphans.append(patch_info)
+
+    return orphans
