@@ -22,7 +22,11 @@ Update docs across all repos to reflect the package restructuring and new featur
 ### sciath-ui
 - [ ] Document waterfall demo view component (when built in Week 4)
 
+## Package release TODOs
+- [ ] Once sciath-cli is public on PyPI: update sciath backend requirements/base.txt from `git+https://...` to `sciath-cli>=0.3.0`
+- [ ] Check PyPI availability of "sciath" package name before rename
+- [ ] Publish sciath-cli to PyPI
+
 ## Strategic TODOs
 - [ ] Timesys/Lynx+NXP distribution/partnership strategy (from CEO review)
-- [ ] Check PyPI availability of "sciath" package name before rename
 - [ ] Set up CI sync script: sciath-cli → sciath-meta on release
