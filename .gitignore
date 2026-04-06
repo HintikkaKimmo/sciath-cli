@@ -9,3 +9,4 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .DS_Store
+sciath_cli/discovery/data/vulns_index.json

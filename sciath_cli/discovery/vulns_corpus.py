@@ -22,11 +22,14 @@ logger = logging.getLogger(__name__)
 VULNS_GIT_URL = "https://git.kernel.org/pub/scm/linux/security/vulns.git"
 
 # Each CVE file in vulns.git has a structured format with fix commits
-_FIX_COMMIT_RE = re.compile(r"^fix:\s+([0-9a-f]{12,40})\b", re.MULTILINE)
-_BRANCH_FIX_RE = re.compile(
-    r"^fixed-by:\s+([0-9a-f]{12,40})\s+in\s+(\S+)", re.MULTILINE
+# vulns.git file formats:
+# .sha1 — single line with the mainline fix commit hash
+# .dyad — pairs of vulnerable:fix per branch: vuln_ver:vuln_hash:fix_ver:fix_hash
+# .mbox — email announcement (parsed for Subject line CVE reference)
+_SHA1_RE = re.compile(r"^([0-9a-f]{40})\s*$")
+_DYAD_LINE_RE = re.compile(
+    r"^([^:]*):([0-9a-f]{40}):([^:]*):([0-9a-f]{40})\s*$"
 )
-_AFFECTED_RE = re.compile(r"^introduced-by:\s+([0-9a-f]{12,40})", re.MULTILINE)
 
 
 @dataclass
@@ -109,24 +112,43 @@ def build_index(vulns_repo_path: Path) -> VulnsIndex:
     index = VulnsIndex(build_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     index.source_commit = _get_git_commit(vulns_repo_path)
 
-    # vulns.git structure: cve/published/YYYY/CVE-YYYY-NNNNN.mbox (or .txt)
-    cve_dirs = [
-        vulns_repo_path / "cve" / "published",
-        vulns_repo_path / "cve" / "reserved",
-    ]
+    # vulns.git structure: cve/<status>/YYYY/CVE-YYYY-NNNNN.<ext>
+    # Status dirs: published, rejected, reserved, returned, review, testing
+    # File types: .sha1 (mainline fix hash), .dyad (branch fix pairs), .mbox (announcement)
+    cve_base = vulns_repo_path / "cve"
+    if not cve_base.exists():
+        logger.warning("No cve/ directory found in vulns repo at %s", vulns_repo_path)
+        return index
 
-    for cve_dir in cve_dirs:
-        if not cve_dir.exists():
+    # Scan all status directories for CVE files
+    for status_dir in sorted(cve_base.iterdir()):
+        if not status_dir.is_dir() or status_dir.name in ("schema", "cvelistV5"):
             continue
-        for year_dir in sorted(cve_dir.iterdir()):
+        for year_dir in sorted(status_dir.iterdir()):
             if not year_dir.is_dir():
                 continue
-            for cve_file in year_dir.iterdir():
-                if cve_file.suffix not in (".mbox", ".txt", ""):
+            # Group files by CVE ID (one CVE can have .sha1 + .dyad + .mbox)
+            cve_files: dict[str, list[Path]] = {}
+            for f in year_dir.iterdir():
+                if not f.name.startswith("CVE-"):
                     continue
-                cve_fix = _parse_cve_file(cve_file)
+                # Extract CVE ID from filename (strip extensions like .sha1, .dyad, .mbox.rejected)
+                cve_id = f.name.split(".")[0]
+                if cve_id not in cve_files:
+                    cve_files[cve_id] = []
+                cve_files[cve_id].append(f)
+
+            for cve_id, files in cve_files.items():
+                cve_fix = _parse_cve_files(cve_id, files)
                 if cve_fix:
-                    index.cve_fixes[cve_fix.cve_id] = cve_fix
+                    # Merge with existing if we've seen this CVE in another status dir
+                    if cve_id in index.cve_fixes:
+                        existing = index.cve_fixes[cve_id]
+                        if not existing.mainline_fix and cve_fix.mainline_fix:
+                            existing.mainline_fix = cve_fix.mainline_fix
+                        existing.branch_fixes.update(cve_fix.branch_fixes)
+                    else:
+                        index.cve_fixes[cve_id] = cve_fix
 
     index.total_cves = len(index.cve_fixes)
     logger.info("Built vulns index: %d CVEs with fix commits", index.total_cves)
@@ -173,37 +195,38 @@ def load_index(index_path: Path) -> Optional[VulnsIndex]:
         return None
 
 
-def _parse_cve_file(cve_file: Path) -> Optional[CveFix]:
-    """Parse a single CVE file from vulns.git."""
-    # Extract CVE ID from filename
-    name = cve_file.stem
-    if not name.startswith("CVE-"):
-        return None
+def _parse_cve_files(cve_id: str, files: list[Path]) -> Optional[CveFix]:
+    """Parse CVE files from vulns.git (may be .sha1, .dyad, .mbox)."""
+    fix = CveFix(cve_id=cve_id)
 
-    try:
-        text = cve_file.read_text(errors="replace")
-    except OSError:
-        return None
+    for f in files:
+        try:
+            text = f.read_text(errors="replace").strip()
+        except OSError:
+            continue
 
-    fix = CveFix(cve_id=name)
+        if f.name.endswith(".sha1"):
+            # Single mainline fix commit hash
+            match = _SHA1_RE.match(text)
+            if match:
+                fix.mainline_fix = match.group(1)
 
-    # Extract mainline fix commit
-    mainline_match = _FIX_COMMIT_RE.search(text)
-    if mainline_match:
-        fix.mainline_fix = mainline_match.group(1)
+        elif ".dyad" in f.name:
+            # Dyad format: vuln_ver:vuln_hash:fix_ver:fix_hash per line
+            for line in text.splitlines():
+                line = line.strip()
+                if line.startswith("#") or not line:
+                    continue
+                match = _DYAD_LINE_RE.match(line)
+                if match:
+                    fix_version = match.group(3)
+                    fix_hash = match.group(4)
+                    if fix_version and fix_version != "0":
+                        fix.branch_fixes[fix_version] = fix_hash
+                    elif not fix.mainline_fix:
+                        fix.mainline_fix = fix_hash
 
-    # Extract branch-specific fixes
-    for match in _BRANCH_FIX_RE.finditer(text):
-        commit_hash = match.group(1)
-        branch = match.group(2)
-        fix.branch_fixes[branch] = commit_hash
-
-    # Extract introduced-by commit
-    intro_match = _AFFECTED_RE.search(text)
-    if intro_match:
-        fix.introduced_by = intro_match.group(1)
-
-    # Only include CVEs that have at least one fix commit
+    # Only include CVEs with at least one fix commit
     if not fix.mainline_fix and not fix.branch_fixes:
         return None
 

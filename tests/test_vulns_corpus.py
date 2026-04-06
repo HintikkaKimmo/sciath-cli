@@ -18,17 +18,23 @@ def vulns_repo(tmp_path: Path) -> Path:
     published = tmp_path / "cve" / "published" / "2024"
     published.mkdir(parents=True)
 
-    (published / "CVE-2024-1234").write_text(
-        "Subject: fix null deref in usb\n"
-        "fix: abc123def456abc123def456abc123def456abc1\n"
-        "fixed-by: 111222333444 in linux-6.6.y\n"
-        "introduced-by: deadbeef1234\n"
+    # .sha1 file — mainline fix commit (exactly 40 hex chars)
+    (published / "CVE-2024-1234.sha1").write_text(
+        "abc123def456abc123def456abc123def456abc1\n"
     )
-    (published / "CVE-2024-5678").write_text(
-        "Subject: fix buffer overflow in net\n"
-        "fix: fedcba9876543210fedcba9876543210fedcba98\n"
+    # .dyad file — branch-specific fixes for same CVE
+    (published / "CVE-2024-1234.dyad").write_text(
+        "# dyad version: test\n"
+        "6.6.50:0000000000000000000000000000000000000000:6.6.55:111222333444555666777888999000aaabbbccc1\n"
     )
-    (published / "CVE-2024-9999").write_text(
+
+    # CVE with only .sha1
+    (published / "CVE-2024-5678.sha1").write_text(
+        "fedcba9876543210fedcba9876543210fedcba98\n"
+    )
+
+    # CVE with no fix (should be skipped)
+    (published / "CVE-2024-9999.mbox").write_text(
         "Subject: reserved CVE, no fix yet\n"
     )
 
@@ -46,14 +52,19 @@ def vulns_repo(tmp_path: Path) -> Path:
 
 
 class TestBuildIndex:
-    def test_parses_cve_with_fix(self, vulns_repo: Path):
+    def test_parses_sha1_file(self, vulns_repo: Path):
         index = build_index(vulns_repo)
         fix = index.lookup("CVE-2024-1234")
         assert fix is not None
         assert fix.mainline_fix == "abc123def456abc123def456abc123def456abc1"
-        assert "linux-6.6.y" in fix.branch_fixes
 
-    def test_parses_cve_without_branch_fixes(self, vulns_repo: Path):
+    def test_parses_dyad_branch_fixes(self, vulns_repo: Path):
+        index = build_index(vulns_repo)
+        fix = index.lookup("CVE-2024-1234")
+        assert fix is not None
+        assert "6.6.55" in fix.branch_fixes
+
+    def test_parses_sha1_only(self, vulns_repo: Path):
         index = build_index(vulns_repo)
         fix = index.lookup("CVE-2024-5678")
         assert fix is not None
@@ -72,7 +83,7 @@ class TestBuildIndex:
         index = build_index(vulns_repo)
         commits = index.get_fix_commits("CVE-2024-1234")
         assert "abc123def456abc123def456abc123def456abc1" in commits
-        assert "111222333444" in commits
+        assert "111222333444555666777888999000aaabbbccc1" in commits
 
 
 class TestIndexSerialization:
