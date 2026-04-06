@@ -14,7 +14,7 @@ import sys
 import typer
 
 from sciath_cli import __version__
-from sciath_cli.commands import assess, auth, policy, project, report, scan, vex
+from sciath_cli.commands import assess, auth, init, policy, project, report, scan, vex
 
 app = typer.Typer(
     name="sciath",
@@ -35,6 +35,7 @@ app.add_typer(assess.app, name="assess")
 app.add_typer(report.app, name="report")
 app.add_typer(vex.app, name="vex")
 app.add_typer(policy.app, name="policy")
+app.add_typer(init.app, name="init")
 
 
 cache_app = typer.Typer(help="Manage the local scan cache.")
