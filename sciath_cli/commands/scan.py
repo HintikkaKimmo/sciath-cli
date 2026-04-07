@@ -53,9 +53,30 @@ def run_scan(
     fail_on_kev: bool = typer.Option(False, "--fail-on-kev", help="Exit 1 if any CISA KEV finding is open"),
     cra_check: bool = typer.Option(False, "--cra-check", help="Show CRA readiness verdict after scan"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Skip local cache, force fresh upload"),
+    auto_discover: bool = typer.Option(False, "--auto-discover", help="Auto-discover artifacts from a build directory"),
+    build_dir: Optional[Path] = typer.Option(None, "--build-dir", help="Build directory for --auto-discover (default: cwd)"),
+    build_system: Optional[str] = typer.Option(None, "--build-system", help="Build system hint for --auto-discover (yocto, buildroot, debian, openwrt)"),
     config: Any = None,
 ) -> None:
     """Run a vulnerability scan on a firmware SBOM."""
+    # --auto-discover: use the discovery module to find all artifacts
+    if auto_discover:
+        _run_auto_discover(
+            build_dir=build_dir,
+            build_system=build_system or "",
+            project_id=project_id,
+            version=version,
+            policy=policy,
+            output_format=output_format,
+            explain=explain,
+            severity_threshold=severity_threshold,
+            fail_on_kev=fail_on_kev,
+            cra_check=cra_check,
+            no_cache=no_cache,
+            config=config,
+        )
+        return  # _run_auto_discover raises typer.Exit
+
     # Auto-detect SBOM if not provided
     if sbom is None:
         sbom = _auto_detect_sbom()
@@ -183,6 +204,158 @@ def run_scan(
 
     # Save to local cache for future runs with same inputs
     _cache.save_cache(proj_id, version, sbom_raw, kconfig_raw, dtb_raw, str(result.get("id", "")), custom_filter_raw)
+
+    formatter.render_scan(result, assessments=assessments)
+
+    if cra_check and result:
+        scan_id = str(result.get("id", ""))
+        if scan_id:
+            try:
+                with SciathAPI(config) as api:
+                    cra_data = api.get_cra_readiness(scan_id)
+                render_cra_readiness(cra_data, output_format=output_format)
+            except SciathAPIError:
+                console.print("  [dim]CRA readiness check unavailable[/dim]")
+
+    raise typer.Exit(formatter.exit_code)
+
+
+def _run_auto_discover(
+    build_dir: Optional[Path],
+    build_system: str,
+    project_id: Optional[str],
+    version: Optional[str],
+    policy: Optional[str],
+    output_format: str,
+    explain: bool,
+    severity_threshold: str,
+    fail_on_kev: bool,
+    cra_check: bool,
+    no_cache: bool,
+    config: Any,
+) -> None:
+    """Run a scan using the discovery module to find artifacts automatically."""
+    from sciath_cli.discovery import auto_discover
+    from sciath_cli.discovery.submit import bundle_to_payload
+
+    resolved_dir = str((build_dir or Path.cwd()).resolve())
+
+    console.print(f"  [dim]Discovering artifacts in {resolved_dir}...[/dim]")
+    try:
+        bundle = auto_discover(resolved_dir, build_system)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        console.print(f"[red]✗ Discovery failed: {exc}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"  [dim]{bundle.summary()}[/dim]")
+
+    if not bundle.has_sbom:
+        console.print("[red]✗ No SBOM found in build directory.[/red]")
+        raise typer.Exit(1)
+
+    proj_id = project_id or config.active_project_id
+    if not proj_id:
+        console.print(
+            "[red]✗ No project selected.[/red] "
+            "Run [bold]sciath project select <name>[/bold] or pass [bold]--project <id>[/bold]."
+        )
+        raise typer.Exit(1)
+
+    if not version:
+        label_parts = [bundle.build_system or "scan"]
+        if bundle.yocto_machine:
+            label_parts.append(bundle.yocto_machine)
+        label_parts.append(str(int(time.time())))
+        version = "-".join(label_parts)
+
+    payload = bundle_to_payload(bundle, proj_id, version, policy_name=policy)
+
+    # Check local cache
+    from sciath_cli import cache as _cache
+
+    cached_scan_id = None
+    if not no_cache:
+        cached_scan_id = _cache.get_cached_scan(
+            proj_id, version,
+            payload["sbom_raw"], payload["kconfig_raw"],
+            payload.get("dtb_raw", ""),
+            payload.get("custom_filter_raw", ""),
+        )
+
+    formatter = OutputFormatter(
+        format=output_format,
+        explain=explain,
+        severity_threshold=severity_threshold,
+        fail_on_kev=fail_on_kev,
+    )
+
+    result: dict[str, Any] | None = None
+    assessments: list[dict[str, Any]] | None = None
+
+    with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console) as progress:
+        task = progress.add_task("  Uploading artifacts...", total=None)
+
+        with SciathAPI(config) as api:
+            if cached_scan_id:
+                try:
+                    result = api.get_scan_status(cached_scan_id)
+                    if result.get("status") in _TERMINAL_STATUSES:
+                        progress.update(task, description="  Using cached result...")
+                        assessments = None
+                        if explain or output_format == "json" or severity_threshold or fail_on_kev:
+                            try:
+                                resp = api.list_assessments(scan_id=cached_scan_id, limit=2000)
+                                assessments = resp.get("items", [])
+                            except SciathAPIError:
+                                pass
+                        console.print("  [dim]Cache hit — using previous scan result[/dim]")
+                        formatter.render_scan(result, assessments=assessments)
+                        raise typer.Exit(formatter.exit_code)
+                except SciathAPIError:
+                    pass
+
+            try:
+                scan = api.create_scan(
+                    project_id=payload["project_id"],
+                    version_label=payload["version_label"],
+                    sbom_raw=payload["sbom_raw"],
+                    sbom_format=payload["sbom_format"],
+                    kconfig_raw=payload["kconfig_raw"],
+                    dtb_raw=payload.get("dtb_raw", ""),
+                    custom_filter_raw=payload.get("custom_filter_raw", ""),
+                    policy_name=payload.get("policy_name"),
+                    yocto_machine=payload.get("yocto_machine", ""),
+                    yocto_distro=payload.get("yocto_distro", ""),
+                    kernel_version=payload.get("kernel_version", ""),
+                    idempotency_key=payload.get("idempotency_key"),
+                )
+            except SciathAPIError as exc:
+                console.print(f"\n[red]✗ Failed to create scan: {exc}[/red]")
+                raise typer.Exit(1)
+
+            scan_id = scan["id"]
+            progress.update(task, description="  Running analysis...")
+
+            result = _run_analyse_with_retry(api, scan_id, progress, task)
+
+            assessments = None
+            if result and (explain or output_format == "json" or severity_threshold or fail_on_kev):
+                try:
+                    resp = api.list_assessments(scan_id=scan_id, limit=2000)
+                    assessments = resp.get("items", [])
+                except SciathAPIError:
+                    pass
+
+    if result is None:
+        raise typer.Exit(1)
+
+    _cache.save_cache(
+        proj_id, version,
+        payload["sbom_raw"], payload["kconfig_raw"],
+        payload.get("dtb_raw", ""),
+        str(result.get("id", "")),
+        payload.get("custom_filter_raw", ""),
+    )
 
     formatter.render_scan(result, assessments=assessments)
 

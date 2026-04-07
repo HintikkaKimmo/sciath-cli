@@ -143,3 +143,102 @@ class TestRunScan:
         result = runner.invoke(app, ["scan", "run", str(sbom_file)])
         assert result.exit_code == 1
         assert "login" in result.output.lower()
+
+
+class TestAutoDiscover:
+    def test_auto_discover_happy_path(self, authed_config, tmp_path, monkeypatch):
+        """--auto-discover calls discovery module and submits the bundle."""
+        from sciath_cli.discovery.base import ArtifactBundle
+
+        # Create a fake build dir with SBOM
+        sbom = tmp_path / "sbom.spdx.json"
+        sbom.write_text('{"spdxVersion": "SPDX-2.3", "packages": []}')
+
+        bundle = ArtifactBundle(
+            sbom=sbom, sbom_format="spdx",
+            yocto_machine="rpi4", build_system="yocto",
+        )
+
+        monkeypatch.setattr(
+            "sciath_cli.discovery.auto_discover",
+            lambda build_dir, build_system="": bundle,
+        )
+
+        scan_created = {"id": "scan-auto-uuid", "status": "draft"}
+        analyse_ok = {"status": "ok"}
+        status_ok = {
+            "id": "scan-auto-uuid", "status": "triage",
+            "version_label": "yocto-rpi4-123",
+            "total_components": 30, "total_vulnerabilities": 100,
+            "suppressed_count": 80, "analysed_at": "2026-04-07T10:00:00Z",
+        }
+        _make_api([(200, scan_created), (200, analyse_ok), (200, status_ok)], monkeypatch)
+        monkeypatch.setattr("sciath_cli.commands.scan.time.sleep", lambda _: None)
+
+        result = runner.invoke(app, [
+            "scan", "run", "--auto-discover",
+            "--build-dir", str(tmp_path),
+        ])
+        assert result.exit_code == 0, result.output
+        assert "TRIAGE" in result.output
+
+    def test_auto_discover_no_sbom_exits_1(self, authed_config, tmp_path, monkeypatch):
+        """--auto-discover fails gracefully when no SBOM found."""
+        from sciath_cli.discovery.base import ArtifactBundle
+
+        bundle = ArtifactBundle(build_system="yocto")  # no SBOM
+
+        monkeypatch.setattr(
+            "sciath_cli.discovery.auto_discover",
+            lambda build_dir, build_system="": bundle,
+        )
+
+        result = runner.invoke(app, [
+            "scan", "run", "--auto-discover",
+            "--build-dir", str(tmp_path),
+        ])
+        assert result.exit_code == 1
+        assert "SBOM" in result.output
+
+    def test_auto_discover_detection_failure_exits_1(self, authed_config, tmp_path, monkeypatch):
+        """--auto-discover exits 1 when no build system is detected."""
+        def _fail(build_dir, build_system=""):
+            raise RuntimeError("Could not detect build system")
+
+        monkeypatch.setattr(
+            "sciath_cli.discovery.auto_discover",
+            _fail,
+        )
+
+        result = runner.invoke(app, [
+            "scan", "run", "--auto-discover",
+            "--build-dir", str(tmp_path),
+        ])
+        assert result.exit_code == 1
+        assert "Discovery failed" in result.output
+
+    def test_auto_discover_no_project_exits_1(self, tmp_path, monkeypatch):
+        """--auto-discover without a project configured exits 1."""
+        from sciath_cli.discovery.base import ArtifactBundle
+
+        sbom = tmp_path / "sbom.json"
+        sbom.write_text("{}")
+        bundle = ArtifactBundle(sbom=sbom, sbom_format="cyclonedx", build_system="yocto")
+
+        monkeypatch.setattr(
+            "sciath_cli.discovery.auto_discover",
+            lambda build_dir, build_system="": bundle,
+        )
+
+        import sciath_cli.config as cfg_module
+        from sciath_cli.config import SciathConfig, save_config
+        monkeypatch.setattr(cfg_module, "CONFIG_DIR", tmp_path / ".sciath3")
+        monkeypatch.setattr(cfg_module, "CONFIG_FILE", tmp_path / ".sciath3" / "config.json")
+        save_config(SciathConfig(api_key="sk_test"))  # no active_project_id
+
+        result = runner.invoke(app, [
+            "scan", "run", "--auto-discover",
+            "--build-dir", str(tmp_path),
+        ])
+        assert result.exit_code == 1
+        assert "project" in result.output.lower()
