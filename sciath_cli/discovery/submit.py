@@ -76,6 +76,10 @@ def bundle_to_payload(
     if bundle.kernel_version:
         payload["kernel_version"] = bundle.kernel_version
 
+    # Dedicated field for server-side packageconfig filter layer
+    if bundle.packageconfigs:
+        payload["extracted_packageconfigs"] = bundle.packageconfigs
+
     return payload
 
 

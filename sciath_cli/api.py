@@ -261,6 +261,8 @@ class SciathAPI:
         yocto_distro: str = "",
         kernel_version: str = "",
         idempotency_key: Optional[str] = None,
+        extracted_packageconfigs: Optional[dict[str, list[str]]] = None,
+        bsp_suppressed_cves: Optional[list[str]] = None,
     ) -> dict[str, Any]:
         headers = {}
         if idempotency_key:
@@ -287,6 +289,10 @@ class SciathAPI:
             payload["yocto_distro"] = yocto_distro
         if kernel_version:
             payload["kernel_version"] = kernel_version
+        if extracted_packageconfigs:
+            payload["extracted_packageconfigs"] = extracted_packageconfigs
+        if bsp_suppressed_cves:
+            payload["bsp_suppressed_cves"] = bsp_suppressed_cves
 
         return self._request(
             "POST", "core/v1/scans/",
