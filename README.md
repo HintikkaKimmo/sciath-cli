@@ -54,16 +54,25 @@ sciath scan run firmware.cdx.json \
   --kconfig .config \
   --dtb device.dts \
   --version v3.2.0
+
+# Auto-discover from a Yocto build directory (finds all artifacts automatically)
+sciath scan run --auto-discover --build-dir /home/build/poky/build
+
+# With build system hint
+sciath scan run --auto-discover --build-dir /home/build/poky/build --build-system yocto
 ```
 
 ### 4. Review results
 
 ```bash
-# Table summary (default)
+# Table summary with suppression waterfall (default)
 sciath scan run firmware.cdx.json
 
 # With filter reasoning (why each CVE was suppressed/flagged)
 sciath scan run firmware.cdx.json --explain
+
+# CRA readiness check
+sciath scan run firmware.cdx.json --cra-check
 
 # JSON for scripting / LLM agents
 sciath scan run firmware.cdx.json --format json | jq '.summary'
@@ -81,6 +90,9 @@ sciath scan run firmware.cdx.json \
 sciath scan run firmware.cdx.json \
   --fail-on-kev \
   --format quiet
+
+# Exit 1 if not CRA-shippable
+sciath scan cra-check <scan-id>
 ```
 
 ### 6. Export reports
@@ -126,9 +138,11 @@ sciath vex <scan-id> --format vex_csaf --output csaf.json
 |---------|-------------|
 | `sciath scan` | Auto-detect SBOM and scan (zero-config) |
 | `sciath scan run <sbom>` | Upload SBOM and trigger analysis |
+| `sciath scan run --auto-discover` | Discover all artifacts from build directory |
 | `sciath scan status <id>` | Check scan analysis status |
 | `sciath scan list` | List recent scans |
 | `sciath scan reanalyse <id>` | Re-run analysis on existing scan |
+| `sciath scan cra-check <id>` | CRA readiness verdict (exits 1 if not shippable) |
 
 ### Scan Options
 
@@ -136,14 +150,26 @@ sciath vex <scan-id> --format vex_csaf --output csaf.json
 |------|-------------|
 | `--kconfig, -k <path>` | Kernel .config for hardware-aware filtering |
 | `--dtb, -d <path>` | Device Tree Blob for hardware filtering |
+| `--depgraph <path>` | Bitbake dependency graph (dot format) |
+| `--custom-filter, -cf <path>` | Custom filter rules (JSON) |
 | `--version, -v <label>` | Version label (default: timestamp) |
 | `--project, -p <id>` | Override active project |
 | `--format, -f <fmt>` | Output: `table` (default), `json`, `quiet` |
 | `--explain, -e` | Show filter reasoning per CVE |
 | `--severity-threshold <level>` | Exit 1 if findings >= level (`critical`/`high`/`medium`/`low`) |
 | `--fail-on-kev` | Exit 1 if any open CISA KEV finding |
+| `--cra-check` | Show CRA readiness verdict after scan |
 | `--policy <name>` | Apply a named filter policy to the scan |
 | `--no-cache` | Skip local cache, force fresh upload |
+| `--auto-discover` | Auto-discover artifacts from build directory |
+| `--build-dir <path>` | Build directory for `--auto-discover` (default: cwd) |
+| `--build-system <name>` | Build system hint: `yocto`, `buildroot`, `debian`, `openwrt` |
+
+### Build Setup
+
+| Command | Description |
+|---------|-------------|
+| `sciath init yocto <build-dir>` | Scaffold Sciath integration into a Yocto build |
 
 ### Assessments
 
@@ -176,8 +202,10 @@ sciath vex <scan-id> --format vex_csaf --output csaf.json
 | Format | Flag | Use Case |
 |--------|------|----------|
 | Article 13 PDF | `--format pdf` | Regulatory submission |
+| CRA Evidence Pack | `--format evidence-pack` | Full audit ZIP (SBOM + VEX + PDF + CSV) |
 | CycloneDX VEX | `--format vex_cdx` | Supply chain tooling |
 | CSAF VEX | `--format vex_csaf` | CSIRT notification |
+| SPDX 2.3 | `--format spdx` | SPDX ecosystem tooling |
 | SARIF 2.1.0 | `--format sarif` | GitHub Code Scanning, VS Code |
 | CycloneDX SBOM | `--format sbom_cdx` | SBOM-only export |
 | Combined SBOM+VEX | `--format sbom_vex_cdx` | Full disclosure |
@@ -241,6 +269,47 @@ the current directory for:
 **Device Tree** (auto-detected if present):
 
 - `*.dts`, `*.dtb` in current directory
+
+### Build Directory Discovery (`--auto-discover`)
+
+For Yocto and other build systems, `--auto-discover` walks the entire
+build tree and extracts all available artifacts automatically:
+
+- **SBOM** from `tmp/deploy/spdx/`, `tmp/deploy/cve/`, or CycloneDX output
+- **Kernel .config** from staging or work directories
+- **DTBs** from `tmp/deploy/images/` (capped at 20 by default)
+- **Busybox .config** from busybox work directory
+- **PACKAGECONFIG** flags per recipe (with CVE suppression mapping)
+- **BSP patches** from vendor layers (static analysis, no BitBake required)
+
+PACKAGECONFIG suppressions are serialized into custom filter rules and
+submitted alongside the scan. This enables the suppression waterfall to
+show exactly which CVEs are eliminated by build configuration.
+
+---
+
+## CRA Compliance
+
+### Evidence Pack
+
+Download everything an auditor needs in one command:
+
+```bash
+sciath report <scan-id> --format evidence-pack
+```
+
+The ZIP contains: SBOM, VEX document, Article 13 PDF, suppression
+rationale CSV, CRA readiness verdict, and scan metadata.
+
+### Readiness Check
+
+```bash
+sciath scan cra-check <scan-id>
+```
+
+Returns SHIPPABLE or NOT READY with article-mapped checklist,
+compliance percentage, and blockers. Exits 1 if not shippable
+(useful for CI gating).
 
 ---
 
