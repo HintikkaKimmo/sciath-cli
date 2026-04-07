@@ -92,10 +92,17 @@ class TestPackageConfigSuppression:
         payload = bundle_to_payload(bundle, "proj-1", "v1.0")
         doc = json.loads(payload["custom_filter_raw"])
 
-        assert doc["schema_version"] == "1.0"
+        assert doc["version"] == "1"
         assert len(doc["rules"]) == 3
-        cve_ids = {r["cve_id"] for r in doc["rules"]}
+        cve_ids = {r["match"]["value"] for r in doc["rules"]}
         assert cve_ids == {"CVE-2023-0001", "CVE-2023-0002", "CVE-2023-1000"}
+
+        for rule in doc["rules"]:
+            assert rule["match"]["type"] == "exact_cve"
+            assert rule["result"]["status"] == "not_affected"
+            assert rule["result"]["justification_category"] == "requires_configuration"
+            assert rule["result"]["confidence"] == "medium"
+            assert len(rule["result"]["justification_text"]) >= 20
 
     def test_no_suppressions_no_custom_filter(self, tmp_sbom: Path) -> None:
         bundle = ArtifactBundle(sbom=tmp_sbom, sbom_format="spdx")
