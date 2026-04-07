@@ -31,14 +31,30 @@ sciath-cli/
 │   ├── console.py           # Rich console helpers
 │   ├── output.py            # OutputFormatter (human/JSON modes), _quality_grade()
 │   ├── mcp_server.py        # MCP server for editor integration
-│   └── commands/
-│       ├── auth.py           # sciath login / logout
-│       ├── scan.py           # sciath scan upload / status / list
-│       ├── assess.py         # sciath assess list / update
-│       ├── report.py         # sciath report generate / download
-│       ├── project.py        # sciath project list / create
-│       ├── policy.py         # sciath policy list / create / import-vex
-│       └── vex.py            # sciath vex (direct CycloneDX export)
+│   ├── commands/
+│   │   ├── auth.py           # sciath login / logout
+│   │   ├── scan.py           # sciath scan run / status / list / cra-check
+│   │   ├── assess.py         # sciath assess list / update
+│   │   ├── report.py         # sciath report generate / download
+│   │   ├── project.py        # sciath project list / create
+│   │   ├── policy.py         # sciath policy list / create / import-vex
+│   │   ├── init_cmd.py       # sciath init yocto — one-step build setup
+│   │   └── vex.py            # sciath vex (direct CycloneDX export)
+│   └── discovery/
+│       ├── __init__.py       # auto_discover() entry point
+│       ├── base.py           # ArtifactBundle dataclass, BuildSystemDiscovery ABC
+│       ├── submit.py         # bundle_to_payload() — ArtifactBundle → API payload
+│       ├── yocto.py          # YoctoDiscovery (fully implemented)
+│       ├── bsp_ingest.py     # BSP layer ingestion orchestrator
+│       ├── kernel_fork.py    # Kernel fork analysis (vendor forks, SRCREV)
+│       ├── vulns_corpus.py   # vulns.git database parser
+│       ├── layer_resolver.py # Static layer path resolver (no bitbake)
+│       ├── fingerprint.py    # Diff fingerprinting utilities
+│       ├── buildroot.py      # BuildrootDiscovery (stub)
+│       ├── debian.py         # DebianDiscovery (stub)
+│       ├── openwrt.py        # OpenwrtDiscovery (stub)
+│       ├── packageconfig_maps/  # JSON maps: recipe → flag → CVE suppressions
+│       └── data/             # Pre-built vulns database, vendor profiles
 ├── tests/
 ├── pyproject.toml
 ├── CHANGELOG.md
@@ -113,6 +129,49 @@ We use [Semantic Versioning](https://semver.org/):
 - Don't edit version in `pyproject.toml` — it's read from `__init__.py` automatically
 - Don't create a release without updating CHANGELOG.md
 - Don't push a tag without running tests first (`pytest -v`)
+
+## Discovery module (sciath_cli/discovery/)
+
+Bundled artifact discovery for embedded Linux build systems. Walks a build
+directory, finds SBOMs, kernel configs, DTBs, PACKAGECONFIG, and BSP patches
+without requiring a running BitBake environment (static analysis only).
+
+### Auto-discover flow
+
+```bash
+# From a Yocto build directory:
+sciath scan run --auto-discover --build-dir /home/build/poky/build --build-system yocto
+
+# Or let it auto-detect the build system:
+sciath scan run --auto-discover --build-dir /home/build/poky/build
+```
+
+1. `auto_discover(build_dir, build_system)` tries each registered discovery module
+2. The matching module's `collect()` walks the build tree and returns an `ArtifactBundle`
+3. `bundle_to_payload()` reads all artifact files and serializes them into the API format
+4. PACKAGECONFIG suppressions are serialized into `custom_filter_raw` rules
+5. The payload is submitted via `api.create_scan()`
+
+### Key types
+
+- **`ArtifactBundle`** — dataclass holding paths to all discovered artifacts
+  (SBOM, kconfig, DTBs, busybox config, PACKAGECONFIG flags, metadata)
+- **`BuildSystemDiscovery`** — ABC that each build system implements (`detect()` + `collect()`)
+- **`bundle_to_payload()`** — converts ArtifactBundle to scan API payload dict
+
+### BSP ingestion
+
+The discovery module can also analyse vendor BSP layers:
+- Static recipe parsing (SRC_URI, SRCREV, LINUX_VERSION)
+- Vendor detection (Raspberry Pi, Toradex, NXP, PHYTEC)
+- Kernel fork analysis (vendor forks vs. upstream stable)
+- vulns.git database cross-referencing for version-based CVE suppression
+
+### Init command
+
+```bash
+sciath init yocto /path/to/build   # scaffolds conf/local.conf integration
+```
 
 ## API client pattern
 

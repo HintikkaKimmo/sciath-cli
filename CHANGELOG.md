@@ -9,35 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`--auto-discover` flag for `sciath scan run`.** New flags: `--auto-discover`,
+  `--build-dir`, `--build-system`. Uses the discovery module to walk a build
+  directory, find all artifacts (SBOM, kconfig, DTBs, PACKAGECONFIG), serialize
+  them into the scan API format, and submit. Replaces manual file path arguments
+  for build system integrations.
+- **Discovery payload bridge.** `discovery/submit.py` with `bundle_to_payload()`
+  converts ArtifactBundle to the exact dict format expected by `api.create_scan()`.
+  Serializes PACKAGECONFIG suppressions into custom_filter_raw rules. Generates
+  deterministic idempotency keys.
+- **`sciath init yocto` command.** One-step build setup that scaffolds Sciath
+  integration into a Yocto build directory's `conf/local.conf`.
+- **Discovery module integration.** Bundled discovery module with PACKAGECONFIG
+  maps, Yocto artifact collection, and build system auto-detection.
+- **BSP layer ingestion.** Static layer resolver, vendor adapter pattern
+  (Raspberry Pi, Toradex, NXP, PHYTEC), kernel fork analysis, recipe parsing
+  without BitBake. Captures vendor patches, git source forks, and orphan patches.
+- **Kernel fork analysis.** Detects vendor kernel forks vs. upstream stable,
+  extracts SRCREV and version info for version-based CVE suppression.
+- **vulns.git corpus parser.** Parses linux kernel vulns.git repository format
+  (`.sha1` + `.dyad` files) for cross-referencing BSP kernel versions against
+  known CVE fixes.
+- **Negated PACKAGECONFIG flags.** OpenSSL `no-*` flags (e.g., `no-ssl3`) now
+  correctly handled as `negated_flag` effect type in suppression maps.
 - **Suppression funnel waterfall.** Scan results now display a per-layer
   suppression waterfall showing CVE count at each filter stage (build-time →
   Kconfig → DTB → PACKAGECONFIG → busybox → patch → custom → deployment).
   Renders in both table format (terminal) and JSON output. Skipped layers
   show why they were skipped.
-
 - **Per-CVE suppression rationale in `--explain` mode.** The explain table now
   shows artifact-specific rationale for each suppressed CVE (e.g.
   `CONFIG_BT=n — subsystem not compiled (.config)`) instead of generic
   justification categories. JSON output includes `suppression_rationale` per
   assessment.
-
 - **"Why it matters" for surviving CVEs.** `--explain` mode now shows a
   "WHY THESE CVEs MATTER" section for unsuppressed findings, sorted by
   severity (KEV first, then CVSS descending). Shows CVSS, EPSS, KEV flags,
   and survival rationale explaining why each CVE passed through filters.
-
 - **CRA Evidence Pack download.** `sciath report <scan-id> --format evidence-pack`
   downloads a ZIP containing SBOM, VEX, Article 13 PDF, suppression rationale
   CSV, CRA readiness verdict, and scan metadata. One command for everything
   an auditor needs.
-
 - **CRA readiness check.** New `sciath scan cra-check <scan-id>` command
   shows a single CRA readiness verdict (SHIPPABLE / NOT READY) with
   article-mapped checklist, compliance percentage, and blockers. Also
   available as `--cra-check` flag on `sciath scan run`. Exits 1 if not
   shippable (useful for CI gating). Supports table, json, quiet formats.
-
-
+- **Stronger color coding.** Waterfall and scan summary use richer color
+  coding for severity levels.
 - **OAuth2 token support.** `sciath login` now supports OAuth2 bearer tokens with
   automatic refresh. Works alongside existing API key auth.
 - **`--debug` flag.** Global `--debug` flag enables verbose logging across all commands.
@@ -67,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`reanalyse --explain` fetches assessments.** Previously, `sciath scan reanalyse`
+  with `--explain` did not fetch assessment data for the explain table.
+- **vulns.git format parsing.** Corrected parser for `.sha1` + `.dyad` file format
+  used by the linux kernel vulns.git repository.
 - `sciath project create` flag parsing corrected.
 - Scan ID prefix resolution now works with short prefixes.
 - Error messages across all commands improved with actionable hints.
