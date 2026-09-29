@@ -76,6 +76,7 @@ jobs:
           for package in dist/*.whl dist/*.tar.gz; do
             smoke_env="$(mktemp -d)/venv"
             uv venv "$smoke_env" --python 3.13
-            uv pip install --python "$smoke_env/bin/python" "$package"
+            uv pip install --python "$smoke_env/bin/python" "$package" pytest pytest-httpx pytest-asyncio
             (cd "$RUNNER_TEMP" && "$smoke_env/bin/python" "$GITHUB_WORKSPACE/.github/scripts/smoke_install.py")
+            (cd "$RUNNER_TEMP" && "$smoke_env/bin/python" -m pytest "$GITHUB_WORKSPACE/tests" --import-mode=importlib -q)
           done
