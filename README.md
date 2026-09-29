@@ -13,6 +13,9 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Install
 
+Requires Python 3.11 or newer. Scanning and reports require a Sciath account
+and access to the Sciath API.
+
 ```bash
 pip install sciath-cli
 ```
@@ -22,6 +25,10 @@ For development (from this repo):
 ```bash
 pip install -e ".[dev]"
 ```
+
+Maintainers: see [the release guide](docs/RELEASING.md) for PyPI setup and
+publishing. This release provides a Python package; standalone executables
+are not included.
 
 ---
 

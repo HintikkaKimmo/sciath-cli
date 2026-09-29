@@ -1,6 +1,7 @@
 # Release workflow: build sciath CLI binaries and publish to GitHub Releases.
 #
-# Triggered by: push of a tag matching v* (e.g. v0.1.0)
+# Manual only: standalone binaries are not part of the PyPI release.
+# This workflow still needs a sciath.spec and validated native architecture builds.
 #
 # Matrix:
 #   linux/x86_64   — ubuntu-latest (native)
@@ -17,12 +18,10 @@
 #
 # Output: per-platform .tar.gz + .bundle (Sigstore) + .sbom.cdx.json uploaded to GitHub Release.
 
-name: Release
+name: Standalone binaries (manual)
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write        # create releases and upload assets
