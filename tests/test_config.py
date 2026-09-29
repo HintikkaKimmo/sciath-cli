@@ -108,13 +108,13 @@ class TestRequiresAuth:
         assert received["config"].api_key == "sk_live_test"
 
     def test_exits_when_no_api_key(self):
-        import click
+        import typer
 
         @requires_auth
         def dummy(config=None):
             pass
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             dummy()
 
     def test_preserves_function_name(self):

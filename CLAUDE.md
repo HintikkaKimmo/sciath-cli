@@ -60,7 +60,8 @@ sciath-cli/
 ├── CHANGELOG.md
 ├── LICENSE                   # MIT
 └── .github/workflows/
-    └── release.yml           # Build binaries + GitHub Release on tag push
+    ├── python-publish.yml    # Test/build/publish Python package on release
+    └── release.yml           # Manual standalone binaries (unfinished)
 ```
 
 ## Commands
@@ -85,50 +86,13 @@ We use [Semantic Versioning](https://semver.org/):
 
 ## Release workflow
 
-### Steps to release a new version
+Follow [docs/RELEASING.md](docs/RELEASING.md). Publishing a GitHub Release as a
+maintainer triggers `python-publish.yml`: version checks, tests and audits,
+clean wheel/source installations, then PyPI Trusted Publishing using the
+`pypi` environment. Version is read from `sciath_cli/__init__.py`.
 
-1. **Bump version** in `sciath_cli/__init__.py`:
-   ```python
-   __version__ = "0.2.0"
-   ```
-
-2. **Update CHANGELOG.md** — add a new section at the top:
-   ```markdown
-   ## [0.2.0] - YYYY-MM-DD
-
-   ### Added
-   - New feature description
-
-   ### Fixed
-   - Bug fix description
-
-   [0.2.0]: https://github.com/HintikkaKimmo/sciath-cli/releases/tag/v0.2.0
-   ```
-
-3. **Commit and tag:**
-   ```bash
-   git add sciath_cli/__init__.py CHANGELOG.md
-   git commit -m "release: v0.2.0"
-   git tag v0.2.0
-   git push origin master --tags
-   ```
-
-4. **GitHub Actions** (automatic on tag push):
-   - Runs tests
-   - Builds PyInstaller binaries (linux x86_64/aarch64, macOS arm64/x86_64)
-   - Creates GitHub Release with binaries + checksums
-
-5. **Publish to PyPI** (manual for now):
-   ```bash
-   python -m build
-   twine upload dist/sciath_cli-0.2.0*
-   ```
-
-### What NOT to do
-
-- Don't edit version in `pyproject.toml` — it's read from `__init__.py` automatically
-- Don't create a release without updating CHANGELOG.md
-- Don't push a tag without running tests first (`pytest -v`)
+Update CHANGELOG.md and pass all CI jobs before tagging. The standalone binary
+workflow is manual and unfinished; it is not part of the Python release.
 
 ## Discovery module (sciath_cli/discovery/)
 

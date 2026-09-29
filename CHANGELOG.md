@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-29
+
 ### Added
 
 - **`--auto-discover` flag for `sciath scan run`.** New flags: `--auto-discover`,
@@ -86,6 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Release dependencies.** Updated vulnerable locked dependencies and limited
+  MCP to patched 1.x releases, preserving the existing server API.
+- **Python publishing.** Release checks now verify the tag, run tests and the
+  dependency audit, and test clean wheel and source installs before uploading
+  to PyPI. Standalone binary builds are manual and excluded from this release.
 - **`reanalyse --explain` fetches assessments.** Previously, `sciath scan reanalyse`
   with `--explain` did not fetch assessment data for the explain table.
 - **vulns.git format parsing.** Corrected parser for `.sha1` + `.dyad` file format
@@ -94,7 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Scan ID prefix resolution now works with short prefixes.
 - Error messages across all commands improved with actionable hints.
 
-[Unreleased]: https://github.com/HintikkaKimmo/sciath-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/HintikkaKimmo/sciath-cli/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/HintikkaKimmo/sciath-cli/releases/tag/v0.3.0
 
 ## [0.2.0] - 2026-03-26
 
